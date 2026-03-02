@@ -1,0 +1,10 @@
+{
+  "commit": "cad15f2",
+  "fullHash": "cad15f2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f",
+  "message": "Analysis + skill refinements",
+  "timestamp": "2026-03-01T08:22:15-05:00",
+  "runs": 3,
+  "model": "minimax/MiniMax-M2.5",
+  "testDate": "2026-03-02T06:42:39",
+  "filesChanged": ["assets/skills/intellisearch/SKILL.md", "assets/skills/intellisearch/references/search-workflow.md"]
+}
