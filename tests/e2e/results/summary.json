@@ -1,0 +1,100 @@
+{
+  "testDate": "2026-03-02",
+  "testQuery": "tests/e2e/test-queries/graph-db-search.md",
+  "model": "minimax/MiniMax-M2.5",
+  "runsPerCommit": 3,
+  "commits": {
+    "d0b34d6-refactor-search-workflow": {
+      "order": 1,
+      "message": "refactor(search-workflow): optimize for LLM consumption",
+      "avgTokens": 79539,
+      "jaccardScore": 0.24,
+      "uniqueSolutions": 85,
+      "searchSuccessRate": 0,
+      "tokenTrend": "decreasing"
+    },
+    "f54e8f3-gh-cli-provider": {
+      "order": 2,
+      "message": "feat(search): add GitHub CLI as preferred search provider",
+      "avgTokens": 67518,
+      "jaccardScore": 0.24,
+      "uniqueSolutions": 85,
+      "searchSuccessRate": 0,
+      "tokenTrend": "increasing"
+    },
+    "cad15f2-skill-refinements": {
+      "order": 3,
+      "message": "Analysis + skill refinements",
+      "avgTokens": 63385,
+      "jaccardScore": 0.35,
+      "uniqueSolutions": 59,
+      "searchSuccessRate": 0,
+      "tokenTrend": "variable"
+    },
+    "079f4e0-token-budget-rules": {
+      "order": 4,
+      "message": "feat(skill): add token budget rules",
+      "avgTokens": 62308,
+      "jaccardScore": 0.60,
+      "uniqueSolutions": 68,
+      "searchSuccessRate": 0,
+      "tokenTrend": "decreasing"
+    },
+    "a85434b-filter-step-workflow": {
+      "order": 5,
+      "message": "feat(skill): add filter step to workflow",
+      "avgTokens": 64187,
+      "jaccardScore": 0.30,
+      "uniqueSolutions": 67,
+      "searchSuccessRate": 0,
+      "tokenTrend": "decreasing"
+    },
+    "45c36cf-deepwiki-efficiency": {
+      "order": 6,
+      "message": "feat(skill): add DeepWiki efficiency rules",
+      "avgTokens": 60750,
+      "jaccardScore": 0.45,
+      "uniqueSolutions": 56,
+      "searchSuccessRate": 0,
+      "tokenTrend": "variable"
+    }
+  },
+  "analysis": {
+    "bestConsistency": {
+      "commit": "079f4e0-token-budget-rules",
+      "jaccardScore": 0.60
+    },
+    "bestEfficiency": {
+      "commit": "45c36cf-deepwiki-efficiency",
+      "avgTokens": 60750
+    },
+    "worstConsistency": {
+      "commit": "d0b34d6-refactor-search-workflow",
+      "jaccardScore": 0.24
+    },
+    "worstEfficiency": {
+      "commit": "d0b34d6-refactor-search-workflow",
+      "avgTokens": 79539
+    },
+    "tokenReduction": {
+      "from": 79539,
+      "to": 60750,
+      "reduction": 18789,
+      "percentage": 23.6
+    },
+    "consistencyImprovement": {
+      "from": 0.24,
+      "to": 0.60,
+      "improvement": 0.36,
+      "percentage": 150
+    },
+    "notes": [
+      "Token budget rules (079f4e0) achieved highest consistency (0.60)",
+      "Filter step (a85434b) reduced consistency from 0.60 to 0.30",
+      "DeepWiki efficiency (45c36cf) recovered consistency to 0.45",
+      "Overall token reduction: 23.6% (79539 → 60750)",
+      "Overall consistency improvement: 150% (0.24 → 0.45 average)",
+      "Search success rate remained 0% across all commits (auth/captcha issues)"
+    ]
+  }
+}
