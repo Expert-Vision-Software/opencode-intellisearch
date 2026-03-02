@@ -1,12 +1,13 @@
 #!/usr/bin/env pwsh
 # Isolated E2E Test Runner for IntelliSearch Plugin
-# Usage: ./run-isolated-test.ps1 -Runs 3 -PluginSource "C:/path/to/plugin"
+# Usage: ./run-isolated-test.ps1 -Runs 3 -Model "minimax/MiniMax-M2.5" -PluginSource "C:/path/to/plugin"
 
 param(
     [int]$Runs = 3,
     [string]$PluginSource = $PWD,
     [string]$ProjectDir = $PWD,
-    [string]$QueryFile = "./tests/e2e/test-queries/graph-db-search.md"
+    [string]$QueryFile = "./tests/e2e/test-queries/graph-db-search.md",
+    [string]$Model = "minimax/MiniMax-M2.5"
 )
 
 $ErrorActionPreference = "Stop"
@@ -19,6 +20,7 @@ $BatchDir = Join-Path $ResultsBaseDir $BatchTimestamp
 Write-Host "=== IntelliSearch E2E Test Runner ===" -ForegroundColor Cyan
 Write-Host "Batch: $BatchTimestamp"
 Write-Host "Runs: $Runs"
+Write-Host "Model: $Model"
 Write-Host "Plugin: $PluginSource"
 Write-Host ""
 
@@ -76,7 +78,7 @@ for ($i = 1; $i -le $Runs; $i++) {
     
     Push-Location $ProjectDir
     try {
-        opencode run $Query --format json 2>&1 | Tee-Object -FilePath $LogFile | Out-File -FilePath $OutputFile
+        opencode run $Query --format json --model $Model 2>&1 | Tee-Object -FilePath $LogFile | Out-File -FilePath $OutputFile
     }
     catch {
         Write-Warning "Run $i failed: $_"

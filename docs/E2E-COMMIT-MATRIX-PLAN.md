@@ -10,19 +10,20 @@ This document outlines the plan for running automated E2E tests against each com
 | ----------------------------- | --------------------------------- |
 | `main`                        | Production branch                 |
 | `multiple-search-providers`   | Branch-under-test (contains commits to test) |
-| `test-multiple-search-providers` | Testing branch (contains results) |
+| `test-multiple-search-providers` | Testing branch (contains e2e code + results) |
 
 ## Test Configuration
 
-| Parameter    | Value                   |
-| ------------ | ----------------------- |
-| Runs per commit | 2                    |
-| Model        | `minimax/MiniMax-M2.5`  |
-| Query file   | `tests/e2e/test-queries/graph-db-search.md` |
+| Parameter       | Value                                      |
+| --------------- | ------------------------------------------ |
+| Runs per commit | 2                                          |
+| Model           | `minimax/MiniMax-M2.5`                     |
+| Query file      | `tests/e2e/test-queries/graph-db-search.md`|
+| Poll interval   | 20 seconds                                 |
 
-## Commits Under Test
+## Commits Under Test (Chronological Order)
 
-| # | Commit  | Directory Name                    | Message                                      | Files Changed               |
+| # | Commit  | Directory Name                     | Message                                      | Files Changed               |
 |---|---------|----------------------------------- | --------------------------------------------- | --------------------------- |
 | 1 | d0b34d6 | `d0b34d6-refactor-search-workflow` | refactor(search-workflow): optimize for LLM   | search-workflow.md          |
 | 2 | f54e8f3 | `f54e8f3-gh-cli-provider`          | feat(search): add GitHub CLI provider         | SKILL.md, gh-cli.md         |
@@ -33,41 +34,60 @@ This document outlines the plan for running automated E2E tests against each com
 
 ### Skipped Commits
 
-| Commit  | Reason          |
-| ------- | --------------- |
-| 6b82434 | Docs only       |
-| fe2d146 | Docs only       |
-| 680db5b | Merge commit    |
+| Commit  | Reason       |
+| ------- | ------------ |
+| 6b82434 | Docs only    |
+| fe2d146 | Docs only    |
+| 680db5b | Merge commit |
 
-## Execution Phases
+## Execution Workflow
 
 ### Phase 1: Setup
 
-1. Create `test-multiple-search-providers` branch from main
-2. Write this PLAN.md document
-3. Modify `run-isolated-test.ps1` to accept `Model` parameter
-4. Commit setup changes
+1. Clean up existing test results in `tests/e2e/results/`
+2. Commit plan document and test runner changes
 
-### Phase 2: Parallel Testing
+### Phase 2: Sequential Commit Testing
 
-Each commit is tested by a dedicated sub-agent:
+For each commit (executed by agent using background processes):
 
 ```
-Sub-Agent Workflow:
-1. Create temporary worktree
-2. Checkout commit-under-test
-3. Run E2E tests (2 runs with MiniMax-M2.5)
-4. Create metadata.json
-5. Copy results to main worktree
-6. Delete temporary worktree
+LOOP FOR EACH COMMIT:
+
+  1. Merge commit changes without committing:
+     git merge --no-commit --no-ff <commit-hash>
+     git restore --staged .
+  
+  2. Run E2E tests in background:
+     bun run test:e2e (background process)
+  
+  3. Poll for completion every 20 seconds:
+     - Check for new results directory
+     - Monitor background process output
+  
+  4. Once complete, organize results:
+     - Create metadata.json
+     - Move results to tests/e2e/results/commits/<hash-slug>/
+  
+  5. Commit results:
+     git add tests/e2e/results/commits/<hash-slug>/
+     git commit -m "test(e2e): results for <hash>"
+  
+  6. Revert merged changes:
+     git restore .
+  
+  7. Verify clean state, report progress
+  
+  REPEAT for next commit
 ```
 
 ### Phase 3: Aggregation
 
-1. Commit all test results
-2. Update CONCEPT.md with comparison table
-3. Update concept-analysis.md with progression analysis
-4. Push test branch
+1. Generate `tests/e2e/results/summary.json`
+2. Update `docs/CONCEPT.md` with comparison table
+3. Update `docs/concept-analysis.md` with progression analysis
+4. Commit documentation updates
+5. Push test branch
 
 ## Directory Structure
 
@@ -107,42 +127,43 @@ tests/e2e/results/
 
 ## Failure Handling
 
-If a sub-agent fails:
+If a test run fails:
 1. Wait 30 seconds
-2. Launch new attempt
-3. Log failure in `tests/e2e/results/failures.log`
+2. Retry once
+3. If still fails, log to `tests/e2e/results/failures.log` and continue to next commit
 
 ## Workflow Diagram
 
 ```mermaid
 flowchart TB
     subgraph Phase1[Phase 1: Setup]
-        A[Create test branch] --> B[Write PLAN.md]
-        B --> C[Add Model param]
-        C --> D[Commit setup]
+        A[Clean up old results] --> B[Commit plan + setup]
     end
 
-    subgraph Phase2[Phase 2: Parallel Testing]
-        D --> E[Launch 6 sub-agents]
-        E --> F1[Agent: d0b34d6]
-        E --> F2[Agent: f54e8f3]
-        E --> F3[Agent: cad15f2]
-        E --> F4[Agent: 079f4e0]
-        E --> F5[Agent: a85434b]
-        E --> F6[Agent: 45c36cf]
-        
-        F1 --> G[worktree → test → copy → cleanup]
-        F2 --> G
-        F3 --> G
-        F4 --> G
-        F5 --> G
-        F6 --> G
+    subgraph Phase2[Phase 2: Sequential Testing]
+        B --> C1[Commit 1: d0b34d6]
+        C1 --> |merge → test → organize → commit → revert| C2[Commit 2: f54e8f3]
+        C2 --> |merge → test → organize → commit → revert| C3[Commit 3: cad15f2]
+        C3 --> |merge → test → organize → commit → revert| C4[Commit 4: 079f4e0]
+        C4 --> |merge → test → organize → commit → revert| C5[Commit 5: a85434b]
+        C5 --> |merge → test → organize → commit → revert| C6[Commit 6: 45c36cf]
     end
 
     subgraph Phase3[Phase 3: Aggregation]
-        G --> H[Commit results]
-        H --> I[Update CONCEPT.md]
-        I --> J[Update concept-analysis.md]
-        J --> K[Push branch]
+        C6 --> D[Generate summary.json]
+        D --> E[Update CONCEPT.md]
+        E --> F[Update concept-analysis.md]
+        F --> G[Commit & push]
     end
 ```
+
+## Current Status
+
+| Commit  | Status    | Notes |
+| ------- | --------- | ----- |
+| d0b34d6 | Pending   |       |
+| f54e8f3 | Pending   |       |
+| cad15f2 | Pending   |       |
+| 079f4e0 | Pending   |       |
+| a85434b | Pending   |       |
+| 45c36cf | Pending   |       |
