@@ -14,12 +14,14 @@ This document outlines the plan for running automated E2E tests against each com
 
 ## Test Configuration
 
-| Parameter       | Value                                      |
-| --------------- | ------------------------------------------ |
-| Runs per commit | 2                                          |
-| Model           | `minimax/MiniMax-M2.5`                     |
-| Query file      | `tests/e2e/test-queries/graph-db-search.md`|
-| Poll interval   | 20 seconds                                 |
+| Parameter       | Value                                                        |
+| --------------- | ------------------------------------------------------------ |
+| Runs per commit | 2                                                            |
+| Model           | `minimax/MiniMax-M2.5`                                       |
+| Query file      | `tests/e2e/test-queries/graph-db-search.md`                  |
+| Poll interval   | 20 seconds                                                   |
+| Cleanup         | Full revert after each test (staged + working + untracked)   |
+| Preserve results| Do NOT clean `tests/e2e/results/` before starting            |
 
 ## Commits Under Test (Chronological Order)
 
@@ -54,30 +56,41 @@ For each commit (executed by agent using background processes):
 ```
 LOOP FOR EACH COMMIT:
 
-  1. Merge commit changes without committing:
+  1. Track baseline state:
+     git diff --name-only > /tmp/pre-merge-files.txt
+
+  2. Merge commit changes without committing:
      git merge --no-commit --no-ff <commit-hash>
      git restore --staged .
-  
-  2. Run E2E tests in background:
-     bun run test:e2e (background process)
-  
-  3. Poll for completion every 20 seconds:
-     - Check for new results directory
-     - Monitor background process output
-  
-  4. Once complete, organize results:
-     - Create metadata.json
-     - Move results to tests/e2e/results/commits/<hash-slug>/
-  
-  5. Commit results:
-     git add tests/e2e/results/commits/<hash-slug>/
-     git commit -m "test(e2e): results for <hash>"
-  
-  6. Revert merged changes:
-     git restore .
-  
-  7. Verify clean state, report progress
-  
+
+  3. Track merged files for debugging:
+     git diff --name-only > /tmp/post-merge-files.txt
+
+  4. Run E2E tests in background:
+      bun run test:e2e (background process)
+
+  5. Poll for completion every 20 seconds:
+      - Check for new results directory
+      - Monitor background process output
+
+  6. Once complete, organize results:
+      - Create metadata.json
+      - Move results to tests/e2e/results/commits/<hash-slug>/
+
+  7. Commit results:
+      git add tests/e2e/results/commits/<hash-slug>/
+      git commit -m "test(e2e): results for <hash>"
+
+  8. FULL REVERT of all merged changes:
+      git restore --staged .          # Unstage everything
+      git restore .                    # Discard working tree changes
+      git clean -fd                    # Remove untracked files/dirs from merge
+      git merge --abort 2>/dev/null || true  # Abort any pending merge
+
+  9. Verify clean state:
+      git status --short should be empty
+      Log progress to tests/e2e/results/progress.log
+
   REPEAT for next commit
 ```
 
@@ -101,6 +114,8 @@ tests/e2e/results/
 │   ├── f54e8f3-gh-cli-provider/
 │   │   └── ...
 │   └── ... (6 total)
+├── progress.log                    # Test execution progress
+├── failures.log                    # Failed test runs
 └── summary.json                    # Aggregated comparison
 ```
 
@@ -130,7 +145,10 @@ tests/e2e/results/
 If a test run fails:
 1. Wait 30 seconds
 2. Retry once
-3. If still fails, log to `tests/e2e/results/failures.log` and continue to next commit
+3. If still fails:
+   - Log to `tests/e2e/results/failures.log`
+   - **Full revert** (git restore --staged . && git restore . && git clean -fd)
+   - Continue to next commit
 
 ## Workflow Diagram
 
