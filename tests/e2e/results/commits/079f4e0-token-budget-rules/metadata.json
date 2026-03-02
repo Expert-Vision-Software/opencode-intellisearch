@@ -1,0 +1,10 @@
+{
+  "commit": "079f4e0",
+  "fullHash": "079f4e0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e",
+  "message": "feat(skill): add token budget rules",
+  "timestamp": "2026-03-01T09:45:30-05:00",
+  "runs": 3,
+  "model": "minimax/MiniMax-M2.5",
+  "testDate": "2026-03-02T06:51:47",
+  "filesChanged": ["assets/skills/intellisearch/SKILL.md"]
+}
