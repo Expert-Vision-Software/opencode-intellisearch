@@ -8,9 +8,9 @@ Before searching, detect available tools:
 
 ```
 IF gh auth status succeeds:
-  → Use gh search repos
+  → Use gh search repos (PREFERRED - direct API)
 ELSE IF search_tool exists:
-  → Use search tool with site:github.com
+  → Use search tool with keywords (NOT site:github.com)
 ELSE IF fetch_tool exists:
   → Use URI-based search with engine cycling
 ELSE:
@@ -24,9 +24,20 @@ ELSE:
 gh auth status  # Exit 0 = available
 ```
 
-**Search:**
+**Search Patterns (try in order):**
+
 ```bash
-gh search repos --topic=TOPICS --language=LANG --json nameWithOwner,stargazersCount --limit 10
+# 1. Full query with topics and language
+gh search repos "{query}" --topic={topics} --language={lang} --json nameWithOwner,stargazersCount,description --limit 10
+
+# 2. Query with language only
+gh search repos "{query}" --language={lang} --json nameWithOwner,stargazersCount,description --limit 10
+
+# 3. Topic-based search (no query string)
+gh search repos --topic={topics} --language={lang} --json nameWithOwner,stargazersCount,description --limit 10
+
+# 4. Broader keyword search
+gh search repos "{query}" --json nameWithOwner,stargazersCount,description --limit 10
 ```
 
 **Process:**
@@ -39,18 +50,23 @@ gh search repos --topic=TOPICS --language=LANG --json nameWithOwner,stargazersCo
 
 ## Search Tool (Fallback #1)
 
-Use with `site:github.com` operator:
+**DO NOT use `site:github.com`** - it returns full GitHub URLs that get misparsed as repos.
+
+**Instead, search for technology + keywords:**
 
 ```json
-{ "query": "site:github.com {keywords} {language}" }
+{ "query": "{technology} {feature} {language} library package" }
 ```
 
 **Example:**
 ```json
-{
-  "query": "site:github.com semver validation typescript"
-}
+{ "query": "typescript semver validation library npm package" }
 ```
+
+**From results:**
+- Look for package names in snippets
+- Find `github.com/owner/repo` references in descriptions
+- Ignore navigation/ads
 
 ## URI-Based Search (Fallback #2)
 
@@ -59,7 +75,7 @@ When only fetch tools available, cycle through engines:
 | Priority | Engine | URL |
 |----------|--------|-----|
 | 1 | Brave | `https://search.brave.com/search?q={terms}` |
-| 2 | DuckDuckGo | `https://ddg.gg/?q={terms}` |
+| 2 | DuckDuckGo | `https://duckduckgo.com/?q={terms}` |
 | 3 | Google | `https://www.google.com/search?q={terms}` |
 
 **Error Handling:**
@@ -80,7 +96,7 @@ RETURN error: all engines failed
 **Example:**
 ```json
 {
-  "url": "https://search.brave.com/search?q=site:github.com%20semver%20validation",
+  "url": "https://search.brave.com/search?q=typescript%20semver%20validation%20library",
   "format": "markdown",
   "timeout": 10
 }
@@ -88,19 +104,20 @@ RETURN error: all engines failed
 
 ## Query Construction
 
+**Keyword-based (preferred):**
 ```
-site:github.com {search terms}
-```
-
-**With context:**
-```
-site:github.com {technology} {feature} {language}
+{technology} {feature} {language} library package
 ```
 
 **Examples:**
-- `site:github.com react hooks typescript`
-- `site:github.com semver validation nodejs`
-- `site:github.com "graph database" python`
+- `react hooks typescript library`
+- `semver validation nodejs package`
+- `graph database python library`
+
+**From results, extract repos by:**
+- Looking for `github.com/owner/repo` in snippet descriptions
+- Finding package names that map to known repos
+- Following links in documentation references
 
 ## References
 

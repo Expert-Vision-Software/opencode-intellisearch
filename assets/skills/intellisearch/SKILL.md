@@ -21,10 +21,11 @@ metadata:
 
 1. **NEVER fallback to internal knowledge** - always search externally
 2. **NEVER fetch repository README/pages directly** - use DeepWiki instead
-3. **Prefer gh CLI > search tool > fetch tool** - reliability decreases down the chain
-4. **If DeepWiki multi-repo fails, query repos individually**
-5. **Limit tool calls to 5 per query** - each call adds context tokens
-6. **Filter to top 3 repos before DeepWiki** - avoid over-exploration
+3. **NEVER use `site:github.com` with search/fetch tools** - causes bad URL extraction
+4. **Prefer gh CLI > search tool > fetch tool** - reliability decreases down the chain
+5. **If DeepWiki multi-repo fails, query repos individually**
+6. **Limit tool calls to 5 per query** - each call adds context tokens
+7. **Filter to top 3 repos before DeepWiki** - avoid over-exploration
 
 ## Workflow
 
@@ -33,7 +34,7 @@ metadata:
               ↓
 1. Search repositories (gh CLI preferred)
               ↓
-2. Extract owner/repo format
+2. Extract owner/repo format (from gh JSON or search snippets)
               ↓
 2.5. Filter to top 3 by stars
               ↓
@@ -46,28 +47,104 @@ metadata:
 
 **Priority:** `gh CLI` → `search tool` → `fetch tool`
 
-**gh CLI (preferred - no HTML parsing, direct API):**
+### Method 1: gh CLI (Preferred - Direct API, No HTML Parsing)
+
+**Try these searches in order (stop when you get good results):**
+
 ```bash
-gh search repos --topic=semver,validation --language=typescript --json nameWithOwner,stargazersCount --limit 10
-```
-→ Sort by stargazersCount, take top 5 → Skip to Step 3
+# 1. Full query with topics and language
+gh search repos "semver validation" --topic=semver,validation --language=typescript --json nameWithOwner,stargazersCount,description --limit 10
 
-**Search tool:**
+# 2. Query with language only
+gh search repos "semver validation" --language=typescript --json nameWithOwner,stargazersCount,description --limit 10
+
+# 3. Topic-based search (no query string)
+gh search repos --topic=semver,validation --language=typescript --json nameWithOwner,stargazersCount,description --limit 10
+
+# 4. Broader keyword search
+gh search repos "semver validation" --json nameWithOwner,stargazersCount,description --limit 10
+```
+
+**From results:**
+- Sort by `stargazersCount` (descending)
+- Take top 5 candidates
+- **Skip to Step 3** (DeepWiki query)
+
+### Method 2: Search Tool (Fallback - No site: Operator)
+
+**DO NOT use `site:github.com`** - it returns full GitHub URLs that get misparsed.
+
+**Instead, search for the technology + keywords:**
+
 ```json
-{ "query": "site:github.com semver validation typescript" }
+{ "query": "typescript semver validation library npm package" }
 ```
-→ Continue to Step 2
 
-**Fetch tool:** See [search-workflow.md](references/search-workflow.md) for URI cycling
+**Look for:**
+- Package names mentioned (e.g., "semver", "semver-compare")
+- Library names in snippets
+- GitHub repo references in descriptions (e.g., "github.com/user/repo")
+
+**Extract repo names from search snippets:**
+- Look for `github.com/owner/repo` patterns in result descriptions
+- Validate: owner and repo contain only alphanumeric, `-`, `_`, `.`
+
+### Method 3: Fetch Tool (Fallback - URI-Based Search)
+
+Use search engine URLs directly. **DO NOT fetch github.com pages.**
+
+**Engines (try in order):**
+
+| Priority | Engine | URL Pattern |
+|----------|--------|-------------|
+| 1 | Brave | `https://search.brave.com/search?q={encoded_query}` |
+| 2 | DuckDuckGo | `https://duckduckgo.com/?q={encoded_query}` |
+| 3 | Google | `https://www.google.com/search?q={encoded_query}` |
+
+**Example:**
+```json
+{
+  "url": "https://search.brave.com/search?q=typescript%20semver%20validation%20library",
+  "format": "markdown",
+  "timeout": 10
+}
+```
+
+**From results:**
+- Extract repo names from search snippets (not from navigation/ads)
+- Look for `github.com/owner/repo` in result descriptions
+- Ignore any URLs starting with github.com/features, github.com/topics, etc.
 
 ## Step 2: Extract Repositories (skip if gh CLI used)
 
-Parse search results for GitHub URLs:
+**Only needed for search tool / fetch tool results.**
+
+### Valid Repository URL Patterns
 
 | Pattern | Regex | Example |
 |---------|-------|---------|
-| Standard repo | `github\.com/([\w-]+)/([\w.-]+)` | `github.com/npm/node-semver` → `npm/node-semver` |
-| GitHub Pages | `([\w-]+)\.github\.io/([\w.-]+)` | `npm.github.io/semver` → `npm/semver` |
+| Standard repo | `github\.com/([\w-]+)/([\w.-]+)` | `github.com/npm/node-semver` |
+| GitHub Pages | `([\w-]+)\.github\.io/([\w.-]+)` | `npm.github.io/semver` |
+
+### Validation Rules
+
+**Reject URLs where first segment is a GitHub reserved path:**
+
+```
+about, accelerator, apps, archiveprogram, blog, careers, changelog,
+collections, community, contact, customer-stories, docs, enterprise,
+events, explore, features, gist, github, github-apps, issues, login,
+maintainers, marketplace, mcp, notifications, oauth-apps, orgs,
+organizations, password_reset, press, pricing, pull_requests, pulls,
+resources, security, securitylab, sessions, settings, site-policy,
+skills, solutions, sponsors, support, team, topics, trending,
+trust-center, whitepapers, why-github
+```
+
+**Only extract if:**
+- First segment (owner) is NOT in blocked list
+- Owner contains only: alphanumeric, `-`, `_`
+- Repo contains only: alphanumeric, `-`, `_`, `.`
 
 ## Step 2.5: Filter Candidates
 
