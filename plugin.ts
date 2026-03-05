@@ -3,7 +3,7 @@ import { mkdir, readdir, copyFile, readFile } from "node:fs/promises";
 import path from "node:path";
 
 const VERSION: string = JSON.parse(
-  await readFile(path.join(import.meta.dirname, "../../package.json"), "utf-8")
+  await readFile(path.join(import.meta.dirname, "package.json"), "utf-8")
 ).version;
 
 async function copyDir(src: string, dest: string): Promise<void> {
