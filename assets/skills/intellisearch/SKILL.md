@@ -128,18 +128,7 @@ Use search engine URLs directly. **DO NOT fetch github.com pages.**
 
 ### Validation Rules
 
-**Reject URLs where first segment is a GitHub reserved path:**
-
-```
-about, accelerator, apps, archiveprogram, blog, careers, changelog,
-collections, community, contact, customer-stories, docs, enterprise,
-events, explore, features, gist, github, github-apps, issues, login,
-maintainers, marketplace, mcp, notifications, oauth-apps, orgs,
-organizations, password_reset, press, pricing, pull_requests, pulls,
-resources, security, securitylab, sessions, settings, site-policy,
-skills, solutions, sponsors, support, team, topics, trending,
-trust-center, whitepapers, why-github
-```
+**See [deepwiki-tools.md](references/deepwiki-tools.md) for blocked path list.**
 
 **Only extract if:**
 - First segment (owner) is NOT in blocked list
