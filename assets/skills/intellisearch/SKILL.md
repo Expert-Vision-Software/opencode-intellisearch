@@ -4,9 +4,66 @@ description: Searches for technical answers by finding GitHub repositories and q
 license: MIT
 compatibility: opencode
 metadata:
+  version: 0.3.4
   audience: agents
-  topic: github-repository-search
+  topic: github-repository-search, frameworks, libraries, packages, code examples
+  triggers:
+  - "library for"
+  - "package for"
+  - "framework that"
+  - "how to use"
+  - "how do I"
+  - "is there a"
+  - "find a"
+  - "looking for"
+  - "need a"
+  - "alternatives to"
+  - "compare"
+  - "vs"
+  - "npm package"
+  - "github repo"
+  - "open source"
 ---
+
+## When To Use
+
+Use this skill when the user asks about:
+
+- **Libraries/packages**: "Is there a TypeScript library for semver validation?"
+- **Frameworks**: "Which React framework handles server-side rendering?"
+- **API usage**: "How do I use the OpenAI API with streaming?"
+- **Comparisons**: "Compare Next.js vs Remix for my project"
+- **Alternatives**: "Alternatives to Moment.js for date handling"
+- **Installation/setup**: "How do I set up Tailwind with Vite?"
+- **Best practices**: "What's the best way to handle auth in Node.js?"
+- **Code examples**: "Show me how to implement rate limiting in Express"
+- **Troubleshooting**: "Why am I getting CORS errors with Axios?"
+- **Feature discovery**: "Does Prisma support composite keys?"
+
+**Key indicators:**
+- Question mentions specific technology names (React, TypeScript, npm, etc.)
+- Asking for recommendations between options
+- Looking for implementation guidance
+- Need current/authoritative documentation
+
+## When Not To Use
+
+Do NOT use this skill when:
+
+- **General knowledge**: "What is REST?" → Use web search or internal knowledge
+- **Non-technical topics**: "What's the weather?" → Irrelevant
+- **User's own code**: "Debug my script" → Use code analysis tools directly
+- **Specific repository known**: "Tell me about facebook/react" → Use DeepWiki directly
+- **No GitHub relevance**: "How do I cook pasta?" → Irrelevant
+- **Current events/news**: "What happened to NPM yesterday?" → Use web search
+- **Private/internal repos**: "Search my company's private repo" → DeepWiki can't access
+- **Pure syntax questions**: "What's the syntax for arrow functions?" → Use internal knowledge
+- **Opinion questions**: "Is React better than Vue?" → No factual repo answer
+
+**Use alternatives instead:**
+- General concepts → Internal knowledge or web search
+- User's local code → Read/analyze files directly
+- Known specific repo → Call DeepWiki directly without search
 
 ## Definitions
 

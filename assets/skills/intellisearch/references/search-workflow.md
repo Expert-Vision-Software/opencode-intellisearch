@@ -15,6 +15,7 @@ ELSE IF fetch_tool exists:
   → Use URI-based search with engine cycling
 ELSE:
   → Report: "No search capability available"
+  → fallback to internal knowledge
 ```
 
 ## GitHub CLI (Preferred)
