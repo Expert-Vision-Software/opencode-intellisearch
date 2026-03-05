@@ -1,95 +1,83 @@
-# Web Search Workflow
+# Search Workflow
 
 Tool detection and search strategy for finding GitHub repositories.
 
-## Tool Detection
+## Tool Priority
 
 Before searching, detect available tools:
 
 ```
-1. Check for search tools: websearch, google_search, brave_search, etc.
-2. Check for fetch tools: webfetch, fetch, etc.
-3. Branch based on availability
+IF gh auth status succeeds:
+  → Use gh search repos
+ELSE IF search_tool exists:
+  → Use search tool with site:github.com
+ELSE IF fetch_tool exists:
+  → Use URI-based search with engine cycling
+ELSE:
+  → Report: "No search capability available"
 ```
 
-## Decision Tree
+## GitHub CLI (Preferred)
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                   AVAILABLE TOOLS                        │
-└─────────────────────────────────────────────────────────┘
-                          │
-                          ▼
-              ┌───────────────────────┐
-              │  Search tools exist?  │
-              └───────────────────────┘
-                    │           │
-                   YES          NO
-                    │           │
-                    ▼           ▼
-         ┌──────────────┐  ┌──────────────────────┐
-         │ Use search   │  │ Use fetch tools with │
-         │ tool directly│  │ URI-based search     │
-         └──────────────┘  └──────────────────────┘
-                    │           │
-                    │           ▼
-                    │    ┌─────────────────────┐
-                    │    │ Cycle: Brave → DDG  │
-                    │    │ → Google            │
-                    │    │ (first success)     │
-                    │    └─────────────────────┘
-                    │           │
-                    └───────────┘
-                          │
-                          ▼
-              ┌───────────────────────┐
-              │  Extract GitHub repos │
-              └───────────────────────┘
+**Detection:**
+```bash
+gh auth status  # Exit 0 = available
 ```
 
-## Search Tool Strategy
+**Search:**
+```bash
+gh search repos --topic=TOPICS --language=LANG --json nameWithOwner,stargazersCount --limit 10
+```
 
-When search tools are available, use them directly with operators:
+**Process:**
+1. Infer topics from query (framework/library names → topics)
+2. Infer language if mentioned
+3. Sort by stargazersCount, return top 5
+4. Skip to DeepWiki query
 
+**Reference:** [gh-cli.md](gh-cli.md)
+
+## Search Tool (Fallback #1)
+
+Use with `site:github.com` operator:
+
+```json
+{ "query": "site:github.com {keywords} {language}" }
+```
+
+**Example:**
 ```json
 {
   "query": "site:github.com semver validation typescript"
 }
 ```
 
-**Benefits:**
-- Simpler - no URL construction needed
-- Faster - single API call
-- More reliable - no parsing HTML
+## URI-Based Search (Fallback #2)
 
-## URI-Based Search Strategy
+When only fetch tools available, cycle through engines:
 
-When only fetch tools are available, use search engine URLs:
+| Priority | Engine | URL |
+|----------|--------|-----|
+| 1 | Brave | `https://search.brave.com/search?q={terms}` |
+| 2 | DuckDuckGo | `https://ddg.gg/?q={terms}` |
+| 3 | Google | `https://www.google.com/search?q={terms}` |
 
-### Search Engine URLs
-
-| Engine | URL Format |
-|--------|------------|
-| Brave | `https://search.brave.com/search?q={terms}` |
-| DuckDuckGo | `https://ddg.gg/?q={terms}` |
-| Google | `https://www.google.com/search?q={terms}` |
-
-### Error Handling
-
-Try each engine in order until one succeeds:
-
+**Error Handling:**
 ```
-1. Try Brave Search
-   ↓ (on error)
-2. Try DuckDuckGo
-   ↓ (on error)
-3. Try Google Search
-   ↓ (on error)
-4. Report failure
+FOR each engine IN [brave, duckduckgo, google]:
+  result = fetch(engine_url)
+  IF success AND has_search_results:
+    RETURN result
+  CONTINUE
+RETURN error: all engines failed
 ```
 
-### Example Call
+**Failure Causes:**
+- JavaScript redirects (Google)
+- Captchas (DuckDuckGo)
+- HTML parsing issues
 
+**Example:**
 ```json
 {
   "url": "https://search.brave.com/search?q=site:github.com%20semver%20validation",
@@ -100,8 +88,6 @@ Try each engine in order until one succeeds:
 
 ## Query Construction
 
-Always include `site:github.com` to target repositories:
-
 ```
 site:github.com {search terms}
 ```
@@ -111,7 +97,14 @@ site:github.com {search terms}
 site:github.com {technology} {feature} {language}
 ```
 
-**Example:**
-```
-site:github.com react hooks typescript
-```
+**Examples:**
+- `site:github.com react hooks typescript`
+- `site:github.com semver validation nodejs`
+- `site:github.com "graph database" python`
+
+## References
+
+- [gh-cli.md](gh-cli.md)
+- [google-search.md](google-search.md)
+- [brave-search.md](brave-search.md)
+- [ddg-search.md](ddg-search.md)
