@@ -1,0 +1,32 @@
+{
+  "generated": "2026-03-05T06:58:23.997Z",
+  "runCount": 3,
+  "averages": {
+    "inputTokens": 60443,
+    "outputTokens": 2116,
+    "totalTokens": 62560
+  },
+  "runs": [
+    {
+      "timestamp": "run-1-20260305-015037",
+      "inputTokens": 65854,
+      "outputTokens": 2250,
+      "totalTokens": 68104,
+      "logPath": "C:\\dev\\projects\\github\\opencode-intellisearch\\tests\\e2e\\results\\20260305-015037\\run-1-20260305-015037\\output.json"
+    },
+    {
+      "timestamp": "run-2-20260305-015312",
+      "inputTokens": 54440,
+      "outputTokens": 2101,
+      "totalTokens": 56541,
+      "logPath": "C:\\dev\\projects\\github\\opencode-intellisearch\\tests\\e2e\\results\\20260305-015037\\run-2-20260305-015312\\output.json"
+    },
+    {
+      "timestamp": "run-3-20260305-015545",
+      "inputTokens": 61036,
+      "outputTokens": 1998,
+      "totalTokens": 63034,
+      "logPath": "C:\\dev\\projects\\github\\opencode-intellisearch\\tests\\e2e\\results\\20260305-015037\\run-3-20260305-015545\\output.json"
+    }
+  ]
+}

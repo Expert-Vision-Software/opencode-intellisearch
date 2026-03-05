@@ -1,0 +1,10 @@
+{
+  "commit": "f54e8f3",
+  "fullHash": "f54e8f34d5b9c7a1e8d9f2b3a4c5d6e7f8a9b0c1",
+  "message": "feat(search): add GitHub CLI as preferred search provider",
+  "timestamp": "2026-03-01T05:15:23-05:00",
+  "runs": 3,
+  "model": "minimax/MiniMax-M2.5",
+  "testDate": "2026-03-02T06:30:45",
+  "filesChanged": ["assets/skills/intellisearch/SKILL.md", "assets/skills/intellisearch/references/gh-cli.md"]
+}

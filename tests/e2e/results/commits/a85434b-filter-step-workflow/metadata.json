@@ -1,0 +1,10 @@
+{
+  "commit": "a85434b",
+  "fullHash": "a85434b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1",
+  "message": "feat(skill): add filter step to workflow",
+  "timestamp": "2026-03-01T10:32:45-05:00",
+  "runs": 3,
+  "model": "minimax/MiniMax-M2.5",
+  "testDate": "2026-03-02T07:01:36",
+  "filesChanged": ["assets/skills/intellisearch/SKILL.md"]
+}
