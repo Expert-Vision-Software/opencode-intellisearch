@@ -31,38 +31,53 @@ async function findAvailablePort(startPort: number, maxAttempts: number = 100): 
 }
 
 export async function initializeSDKTest(config: TestConfig): Promise<SDKTestContext> {
-  const pluginPath = config.pluginSource.replace(/\\/g, "/");
-  const pluginConfig = pluginPath.startsWith("/") || pluginPath.match(/^[A-Za-z]:/)
-    ? `file://${pluginPath}`
-    : pluginPath;
+  const projectDir = config.testProjectDir;
+  
+  if (!projectDir) {
+    throw new Error("testProjectDir is required in TestConfig");
+  }
   
   const basePort = config.sdk?.port ?? 4096 + Math.floor(Math.random() * 1000);
   const port = await findAvailablePort(basePort, 100);
   
   console.log(`  Using port: ${port}`);
+  console.log(`  Project dir: ${projectDir}`);
   
-  const opencode = await createOpencode({
-    hostname: config.sdk?.hostname ?? "127.0.0.1",
-    port,
-    timeout: config.sdk?.timeout ?? 10000,
-    config: {
-      plugin: [pluginConfig],
-      model: config.model ?? undefined,
-    },
-  });
+  const inlineConfig: Record<string, unknown> = {
+    plugin: [`file:///${config.pluginSource.replace(/\\/g, "/")}`],
+  };
   
-  const session = await opencode.client.session.create({
-    body: { title: `E2E Test ${Date.now()}` },
-  });
-  
-  const sessionId = session.data?.id;
-  if (!sessionId) {
-    throw new Error("Failed to create session: no session ID returned");
+  if (config.model) {
+    inlineConfig.model = config.model;
   }
   
-  return {
-    client: opencode.client,
-    server: opencode.server,
-    sessionId,
-  };
+  process.env.OPENCODE_CONFIG_CONTENT = JSON.stringify(inlineConfig);
+  
+  const originalCwd = process.cwd();
+  process.chdir(projectDir);
+  
+  try {
+    const opencode = await createOpencode({
+      hostname: config.sdk?.hostname ?? "127.0.0.1",
+      port,
+      timeout: config.sdk?.timeout ?? 10000,
+    });
+    
+    const session = await opencode.client.session.create({
+      body: { title: `E2E Test ${Date.now()}` },
+    });
+    
+    const sessionId = session.data?.id;
+    if (!sessionId) {
+      throw new Error("Failed to create session: no session ID returned");
+    }
+    
+    return {
+      client: opencode.client,
+      server: opencode.server,
+      sessionId,
+    };
+  } finally {
+    process.chdir(originalCwd);
+  }
 }

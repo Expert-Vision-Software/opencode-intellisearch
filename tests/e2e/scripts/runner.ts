@@ -1,9 +1,10 @@
 import { $ } from "bun";
-import { join } from "node:path";
+import { join, basename } from "node:path";
 import { mkdir, writeFile, readFile } from "node:fs/promises";
 import type { TestConfig, RunMetrics, AggregatedMetrics, GitMetadata, TokenMetricsReport, ConsistencyReport } from "./types.ts";
 import { initializeSDKTest, type SDKTestContext } from "./sdk-runner.ts";
 import { createEventMonitor, extractSolutions, calculateWorkflowCompliance, type EventMonitor } from "./event-monitor.ts";
+import { setupTestProject, type TestProjectContext } from "./test-project.ts";
 
 function generateResultsDirName(mode: string): string {
   const date = new Date();
@@ -69,7 +70,10 @@ async function runSingleTest(
     
     monitor = await createEventMonitor(context.client, context.sessionId, config);
     
-    const queryContent = await readFile(join(config.projectDir, config.queryFile), "utf-8");
+    const queryFilePath = config.testProjectDir 
+      ? join(config.testProjectDir, config.queryFile)
+      : join(config.projectDir, config.queryFile);
+    const queryContent = await readFile(queryFilePath, "utf-8");
     const query = config.mode === "explicit" 
       ? `/search-intelligently ${queryContent}` 
       : queryContent;
@@ -226,28 +230,45 @@ export async function runTests(config: TestConfig): Promise<{ metrics: Aggregate
   const resultsDir = join(config.projectDir, "tests/e2e/results", resultsDirName);
   await mkdir(resultsDir, { recursive: true });
   
+  const queryFileDir = join(config.projectDir, "tests/e2e/test-queries");
+  const testProject = await setupTestProject(
+    config.pluginSource,
+    queryFileDir,
+    config.model
+  );
+  
+  const testConfig: TestConfig = {
+    ...config,
+    testProjectDir: testProject.directory,
+    queryFile: "test-queries/" + basename(config.queryFile),
+  };
+  
   const runs: RunMetrics[] = [];
   
-  for (let i = 0; i < config.runs; i++) {
-    console.log(`\nRunning test ${i + 1}/${config.runs}...`);
+  try {
+    for (let i = 0; i < testConfig.runs; i++) {
+      console.log(`\nRunning test ${i + 1}/${testConfig.runs}...`);
+      
+      const runTimestamp = Date.now();
+      const runDirName = `run-${i + 1}-${runTimestamp}`;
+      const runDir = join(resultsDir, runDirName);
+      await mkdir(runDir, { recursive: true });
+      
+      const metrics = await runSingleTest(testConfig, i + 1, runDir);
+      runs.push(metrics);
+      
+      await saveRunMetrics(runDir, metrics);
+      
+      const aggregated = computeAggregatedMetrics(runs, meta);
+      await saveTokenMetrics(resultsDir, aggregated);
+      await saveConsistencyReport(resultsDir, aggregated);
+    }
     
-    const runTimestamp = Date.now();
-    const runDirName = `run-${i + 1}-${runTimestamp}`;
-    const runDir = join(resultsDir, runDirName);
-    await mkdir(runDir, { recursive: true });
-    
-    const metrics = await runSingleTest(config, i + 1, runDir);
-    runs.push(metrics);
-    
-    await saveRunMetrics(runDir, metrics);
-    
-    const aggregated = computeAggregatedMetrics(runs, meta);
-    await saveTokenMetrics(resultsDir, aggregated);
-    await saveConsistencyReport(resultsDir, aggregated);
+    const finalAggregated = computeAggregatedMetrics(runs, meta);
+    return { metrics: finalAggregated, resultsDir };
+  } finally {
+    await testProject.cleanup();
   }
-  
-  const finalAggregated = computeAggregatedMetrics(runs, meta);
-  return { metrics: finalAggregated, resultsDir };
 }
 
 async function saveTokenMetrics(resultsDir: string, metrics: AggregatedMetrics): Promise<void> {

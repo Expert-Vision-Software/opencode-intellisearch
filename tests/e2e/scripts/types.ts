@@ -14,6 +14,7 @@ export interface TestConfig {
   queryFile: string;
   pluginSource: string;
   projectDir: string;
+  testProjectDir?: string;
   sdk?: {
     hostname?: string;
     port?: number;
