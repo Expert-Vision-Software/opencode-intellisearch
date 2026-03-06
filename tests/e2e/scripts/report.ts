@@ -27,8 +27,9 @@ function formatTimestamp(ts: number | undefined): string {
   return new Date(ts).toTimeString().slice(0, 8);
 }
 
-export function printToolUse(tool: string, input: Record<string, unknown>, timestamp?: number): void {
+export function printToolUse(tool: string, input: Record<string, unknown>, timestamp?: number, cumulativeTokens?: number): void {
   const time = formatTimestamp(timestamp);
+  const tokens = cumulativeTokens !== undefined ? ` [${cumulativeTokens.toLocaleString()}]` : "";
   let detail = "";
   
   switch (tool) {
@@ -63,13 +64,14 @@ export function printToolUse(tool: string, input: Record<string, unknown>, times
       detail = "";
   }
   
-  console.log(`  → ${color(time, "dim")} ${color(tool, "cyan")}: ${detail}`);
+  console.log(`  → ${color(time, "dim")}${color(tokens, "yellow")} ${color(tool, "cyan")}: ${detail}`);
 }
 
-export function printStepFinish(tokens: { input: number; output: number }, timestamp?: number): void {
+export function printStepFinish(tokens: { input: number; output: number }, timestamp?: number, cumulativeTokens?: number): void {
   const time = formatTimestamp(timestamp);
+  const cumul = cumulativeTokens !== undefined ? ` [${cumulativeTokens.toLocaleString()}]` : "";
   const total = tokens.input + tokens.output;
-  console.log(`  → ${color(time, "dim")} ${color("step_finish", "green")}: ${total.toLocaleString()} tokens (${tokens.input.toLocaleString()} in, ${tokens.output.toLocaleString()} out)`);
+  console.log(`  → ${color(time, "dim")}${color(cumul, "yellow")} ${color("step_finish", "green")}: ${total.toLocaleString()} tokens (${tokens.input.toLocaleString()} in, ${tokens.output.toLocaleString()} out)`);
 }
 
 export function printHeader(mode: SkillMode, runs: number, model: string | null): void {

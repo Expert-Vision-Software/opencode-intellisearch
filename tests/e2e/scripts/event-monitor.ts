@@ -115,12 +115,14 @@ export async function createEventMonitor(
                   command?.startsWith("/search-intelligently") ||
                   prompt?.startsWith("/search-intelligently")) {
                 state.skillDetected = true;
-                console.log(`  ✓ Skill loaded`);
+                const cumulativeTokens = state.tokens.input + state.tokens.output;
+                console.log(`  ✓ Skill loaded [${cumulativeTokens.toLocaleString()}]`);
               }
             }
             
             clearStatusLine();
-            printToolUse(part.tool, input, Date.now());
+            const cumulativeTokens = state.tokens.input + state.tokens.output;
+            printToolUse(part.tool, input, Date.now(), cumulativeTokens);
             
             if (config.mode === "explicit" && 
                 state.toolCallCount >= MAX_TOOL_CALLS_WITHOUT_SKILL && 
@@ -136,9 +138,11 @@ export async function createEventMonitor(
               state.tokens.input += part.tokens.input ?? 0;
               state.tokens.output += part.tokens.output ?? 0;
               clearStatusLine();
+              const cumulativeTokens = state.tokens.input + state.tokens.output;
               printStepFinish(
                 { input: part.tokens.input ?? 0, output: part.tokens.output ?? 0 },
-                Date.now()
+                Date.now(),
+                cumulativeTokens
               );
             }
           }
@@ -147,7 +151,8 @@ export async function createEventMonitor(
         if (event.type === "session.status") {
           const props = event.properties as { sessionID: string; status: { type: string } };
           if (props.sessionID === sessionId && props.status.type === "idle") {
-            console.log(`  Session completed`);
+            const cumulativeTokens = state.tokens.input + state.tokens.output;
+            console.log(`  Session completed [${cumulativeTokens.toLocaleString()}]`);
             if (completionResolve) completionResolve();
             abortController.abort();
           }
