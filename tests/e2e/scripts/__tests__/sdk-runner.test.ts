@@ -1,21 +1,37 @@
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import { initializeSDKTest } from "../sdk-runner.ts";
+import { setupTestProject, type TestProjectContext } from "../test-project.ts";
 import type { TestConfig } from "../types.ts";
+import { join } from "node:path";
 
 describe("SDK Runner", () => {
-  test("should initialize SDK with plugin", async () => {
-    const config: TestConfig = {
+  let testProject: TestProjectContext;
+  let config: TestConfig;
+  
+  beforeAll(async () => {
+    const queryFileDir = join(process.cwd(), "tests/e2e/test-queries");
+    testProject = await setupTestProject(
+      process.cwd(),
+      queryFileDir,
+      null
+    );
+    
+    config = {
       runs: 1,
       mode: "explicit",
       model: null,
-      queryFile: "test.md",
+      queryFile: "test-queries/graph-db-search.md",
       pluginSource: process.cwd(),
       projectDir: process.cwd(),
-      sdk: {
-        port: 4097,
-      },
+      testProjectDir: testProject.directory,
     };
-    
+  });
+  
+  afterAll(async () => {
+    await testProject.cleanup();
+  });
+  
+  test("should initialize SDK with plugin", async () => {
     const context = await initializeSDKTest(config);
     
     expect(context.client).toBeDefined();
@@ -28,27 +44,8 @@ describe("SDK Runner", () => {
   });
   
   test("should create unique session IDs", async () => {
-    const config: TestConfig = {
-      runs: 1,
-      mode: "explicit",
-      model: null,
-      queryFile: "test.md",
-      pluginSource: process.cwd(),
-      projectDir: process.cwd(),
-      sdk: {
-        port: 4098,
-      },
-    };
-    
-    const context1 = await initializeSDKTest({
-      ...config,
-      sdk: { port: 4098 },
-    });
-    
-    const context2 = await initializeSDKTest({
-      ...config,
-      sdk: { port: 4099 },
-    });
+    const context1 = await initializeSDKTest(config);
+    const context2 = await initializeSDKTest(config);
     
     expect(context1.sessionId).not.toBe(context2.sessionId);
     
