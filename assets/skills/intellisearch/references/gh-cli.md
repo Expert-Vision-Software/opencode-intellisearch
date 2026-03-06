@@ -43,33 +43,33 @@ Extract programming language from:
 ### Topic + Language Search
 ```bash
 # Query: "semver validation in TypeScript"
-gh search repos --topic=semver,validation --language=typescript --json nameWithOwner,stargazersCount --limit 10
+gh search repos --topic=semver,validation --language=typescript --json fullName,stargazersCount --limit 10
 ```
 
 ### Keyword Search (Fallback)
 ```bash
 # Query: "cli shell terminal"
-gh search repos cli shell terminal --json nameWithOwner,stargazersCount --limit 10
+gh search repos cli shell terminal --json fullName,stargazersCount --limit 10
 ```
 
 ### Combined Search
 ```bash
 # Topics with additional keywords
-gh search repos "release automation" --topic=semver,versioning --language=typescript --json nameWithOwner,stargazersCount --limit 10
+gh search repos "release automation" --topic=semver,versioning --language=typescript --json fullName,stargazersCount --limit 10
 ```
 
 ## Output Format
 
 ```bash
---json nameWithOwner,stargazersCount --limit 10
+--json fullName,stargazersCount,createdAt,updatedAt,description --limit 10
 ```
 
 **Example output:**
 ```json
 [
-  {"nameWithOwner": "npm/node-semver", "stargazersCount": 4500},
-  {"nameWithOwner": "isaacs/node-semver", "stargazersCount": 1200},
-  {"nameWithOwner": "mattfarina/semver-isvalid", "stargazersCount": 89}
+  {"createdAt":"2020-03-17T21:23:36Z","description":"SEMVER validation Github Action","fullName":"rubenesp87/semver-validation-action","stargazersCount":8,"updatedAt":"2024-03-29T19:31:00Z"},
+  {"createdAt":"2024-10-07T16:18:55Z","description":"An example to prove semverValidate Helm function","fullName":"lucabaggi/helm-semver-validation","stargazersCount":0,"updatedAt":"2024-10-07T16:24:06Z"},
+  {"createdAt":"2022-11-20T13:56:07Z","description":"","fullName":"actions-marketplace-validations/skymatic_semver-validation-action","stargazersCount":0,"updatedAt":"2025-12-06T11:10:03Z"}
 ]
 ```
 
@@ -90,7 +90,7 @@ gh search repos "release automation" --topic=semver,versioning --language=typesc
 | `--sort` | Sort field | `--sort=stars` |
 | `--order` | Sort order | `--order=desc` |
 | `--limit` | Max results | `--limit=10` |
-| `--json` | Output format | `--json nameWithOwner,stargazersCount` |
+| `--json` | Output format | `--json fullName,stargazersCount` |
 | `--archived` | Exclude archived | `--archived=false` |
 
 ## Error Handling

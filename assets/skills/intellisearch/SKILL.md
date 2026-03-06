@@ -89,7 +89,9 @@ Do NOT use this skill when:
 ```
 [Detect tools: gh → search → fetch]
               ↓
-1. Search repositories (gh CLI preferred)
+1. Search repositories
+   - gh CLI: Use "gh search repos" (direct API)
+   - No gh: Use EXTERNAL search engines (Brave/DDG/Google)
               ↓
 2. Extract owner/repo format (from gh JSON or search snippets)
               ↓
@@ -110,20 +112,20 @@ Do NOT use this skill when:
 
 ```bash
 # 1. Full query with topics and language
-gh search repos "semver validation" --topic=semver,validation --language=typescript --json nameWithOwner,stargazersCount,description --limit 10
+gh search repos "semver validation" --topic=semver,validation --language=typescript --json fullName,stargazersCount,createdAt,updatedAt,description --limit 10
 
 # 2. Query with language only
-gh search repos "semver validation" --language=typescript --json nameWithOwner,stargazersCount,description --limit 10
+gh search repos "semver validation" --language=typescript --json fullName,stargazersCount,createdAt,updatedAt,description --limit 10
 
 # 3. Topic-based search (no query string)
-gh search repos --topic=semver,validation --language=typescript --json nameWithOwner,stargazersCount,description --limit 10
+gh search repos --topic=semver,validation --language=typescript --json fullName,stargazersCount,createdAt,updatedAt,description --limit 10
 
 # 4. Broader keyword search
-gh search repos "semver validation" --json nameWithOwner,stargazersCount,description --limit 10
+gh search repos "semver validation" --json fullName,stargazersCount,createdAt,updatedAt,description --limit 10
 ```
 
 **From results:**
-- Sort by `stargazersCount` (descending)
+- Sort by `stargazersCount` (descending), then by `updatedAt` (descending)
 - Take top 5 candidates
 - **Skip to Step 3** (DeepWiki query)
 
@@ -146,11 +148,11 @@ gh search repos "semver validation" --json nameWithOwner,stargazersCount,descrip
 - Look for `github.com/owner/repo` patterns in result descriptions
 - Validate: owner and repo contain only alphanumeric, `-`, `_`, `.`
 
-### Method 3: Fetch Tool (Fallback - URI-Based Search)
+### Method 3: Fetch Tool (Fallback - EXTERNAL Search Engines Only)
 
-Use search engine URLs directly. **DO NOT fetch github.com pages.**
+**CRITICAL: Only fetch EXTERNAL search engines, NEVER github.com.**
 
-**Engines (try in order):**
+**Allowed URLs (external search engines only):**
 
 | Priority | Engine | URL Pattern |
 |----------|--------|-------------|
@@ -170,7 +172,7 @@ Use search engine URLs directly. **DO NOT fetch github.com pages.**
 **From results:**
 - Extract repo names from search snippets (not from navigation/ads)
 - Look for `github.com/owner/repo` in result descriptions
-- Ignore any URLs starting with github.com/features, github.com/topics, etc.
+- Validate owner is NOT in blocked list
 
 ## Step 2: Extract Repositories (skip if gh CLI used)
 
