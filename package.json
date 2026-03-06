@@ -23,7 +23,8 @@
     "check": "tsc --noEmit",
     "test": "bun test",
     "test:watch": "bun test --watch",
-    "test:e2e": "pwsh -File ./tests/e2e/run-isolated-test.ps1"
+    "test:e2e": "bun tests/e2e/scripts/test.ts",
+    "test:e2e:baseline": "bun tests/e2e/scripts/test.ts --set-baseline"
   },
   "dependencies": {
     "@opencode-ai/plugin": "*"
