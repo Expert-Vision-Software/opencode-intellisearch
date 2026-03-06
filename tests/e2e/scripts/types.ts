@@ -40,6 +40,8 @@ export interface RunMetrics {
   workflowCompliance: WorkflowCompliance;
   solutions: string[];
   searchSuccess: boolean;
+  earlyFailure?: boolean;
+  earlyFailureReason?: string;
 }
 
 export interface AggregatedMetrics {

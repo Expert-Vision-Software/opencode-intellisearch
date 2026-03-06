@@ -279,11 +279,6 @@ async function runSingleTest(
       stderr: "pipe"
     });
     
-    console.log(`  Starting OpenCode process...`);
-    console.log(`  Mode: ${config.mode}`);
-    console.log(`  Query preview: ${query.slice(0, 100).replace(/\n/g, ' ')}...`);
-    console.log(`  Process PID: ${proc.pid}`);
-    
     proc.stdin.write(query);
     await proc.stdin.end();
     
@@ -317,89 +312,71 @@ async function runSingleTest(
     }, HARD_TIMEOUT_MS);
     
     const decoder = new TextDecoder();
-    const STREAM_READ_TIMEOUT_MS = 60000;
     
-    async function readStreamWithTimeout(
-      stream: ReadableStream<Uint8Array>,
+    async function readStream(
+      stream: ReadableStream<Uint8Array>, 
       target: string[]
     ): Promise<void> {
       const reader = stream.getReader();
-      
-      try {
-        while (true) {
-          const readPromise = reader.read();
-          const timeoutPromise = new Promise<never>((_, reject) => {
-            setTimeout(() => reject(new Error("Stream read timeout")), STREAM_READ_TIMEOUT_MS);
-          });
-          
-          const { done, value } = await Promise.race([readPromise, timeoutPromise]);
-          
-          if (done) break;
-          
-          const text = decoder.decode(value);
-          target.push(text);
-          
-          for (const line of text.split("\n").filter(Boolean)) {
-            try {
-              const entry = JSON.parse(line);
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        const text = decoder.decode(value);
+        target.push(text);
+        
+        for (const line of text.split("\n").filter(Boolean)) {
+          try {
+            const entry = JSON.parse(line);
+            if (entry.type === "tool_use" && entry.part?.tool) {
+              toolCallCount++;
+              lastActivity = Date.now();
+              lastTool = entry.part.tool;
+              hasPrintedInactivityWarning = false;
               
-              if (entry.type === "tool_use" && entry.part?.tool) {
-                toolCallCount++;
-                lastActivity = Date.now();
-                lastTool = entry.part.tool;
-                hasPrintedInactivityWarning = false;
-                
-                if (toolCallCount % 5 === 0) {
-                  console.log(`  Tool calls: ${toolCallCount}, Skill loaded: ${skillDetected}`);
-                }
-                
-                if (entry.part.tool === "skill" || entry.part.tool === "task") {
-                  const cmd = entry.part.input?.command ?? 
-                              entry.part.state?.input?.command ?? 
-                              entry.part.input?.prompt ?? 
-                              entry.part.state?.input?.prompt ?? "";
-                  if (cmd.startsWith("/search-intelligently") || 
-                      entry.part.input?.name === "intellisearch") {
-                    skillDetected = true;
-                  }
-                }
-                
-                if (config.mode === "explicit" && 
-                    toolCallCount >= MAX_TOOL_CALLS_WITHOUT_SKILL && 
-                    !skillDetected) {
-                  reader.releaseLock();
-                  proc.kill();
-                  throw new Error(
-                    `EARLY_FAILURE: Skill not loaded after ${toolCallCount} tool calls in explicit mode`
-                  );
-                }
-                
-                const tool = entry.part.tool;
-                if (isKeyTool(tool, config.mode, entry.part.input as Record<string, unknown>)) {
-                  clearStatusLine();
-                  printToolUse(tool, entry.part.input ?? {}, entry.timestamp);
+              if (entry.part.tool === "skill" || entry.part.tool === "task") {
+                const cmd = entry.part.input?.command ?? 
+                            entry.part.state?.input?.command ?? 
+                            entry.part.input?.prompt ?? 
+                            entry.part.state?.input?.prompt ?? "";
+                if (cmd.startsWith("/search-intelligently") || 
+                    entry.part.input?.name === "intellisearch") {
+                  skillDetected = true;
                 }
               }
-              if (entry.type === "step_finish" && entry.part?.tokens) {
-                lastActivity = Date.now();
-                clearStatusLine();
-                printStepFinish(
-                  { input: entry.part.tokens.input ?? 0, output: entry.part.tokens.output ?? 0 },
-                  entry.timestamp
+              
+              if (config.mode === "explicit" && 
+                  toolCallCount >= MAX_TOOL_CALLS_WITHOUT_SKILL && 
+                  !skillDetected) {
+                proc.kill();
+                throw new Error(
+                  `EARLY_FAILURE: Skill not loaded after ${toolCallCount} tool calls in explicit mode`
                 );
               }
-            } catch {}
-          }
+              
+              const tool = entry.part.tool;
+              if (isKeyTool(tool, config.mode, entry.part.input as Record<string, unknown>)) {
+                clearStatusLine();
+                printToolUse(tool, entry.part.input ?? {}, entry.timestamp);
+              }
+            }
+            if (entry.type === "step_finish" && entry.part?.tokens) {
+              lastActivity = Date.now();
+              clearStatusLine();
+              printStepFinish(
+                { input: entry.part.tokens.input ?? 0, output: entry.part.tokens.output ?? 0 },
+                entry.timestamp
+              );
+            }
+          } catch {}
         }
-      } finally {
-        reader.releaseLock();
       }
     }
     
     try {
       await Promise.all([
-        readStreamWithTimeout(proc.stdout, outputLines),
-        readStreamWithTimeout(proc.stderr, stderrLines)
+        readStream(proc.stdout, outputLines),
+        readStream(proc.stderr, stderrLines)
       ]);
       
       await proc.exited;
@@ -444,22 +421,13 @@ async function runSingleTest(
       clearStatusLine();
       
       if (proc.exitCode === null) {
-        console.log(`  Process still running, killing...`);
-        proc.kill("SIGKILL");
+        proc.kill();
       }
-      
-      const exitCheckStart = Date.now();
-      while (proc.exitCode === null && Date.now() - exitCheckStart < 5000) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-      
-      const output = outputLines.join("");
-      await writeFile(join(runDir, "output.json"), output);
-      
-      console.log(`  Process exited with code: ${proc.exitCode}`);
     }
     
     const output = outputLines.join("");
+    await writeFile(join(runDir, "output.json"), output);
+    
     const parsed = parseLogOutput(output, config.mode);
     
     const elapsed = Math.floor((Date.now() - startTime) / 1000);
