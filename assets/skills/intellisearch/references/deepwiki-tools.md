@@ -6,6 +6,48 @@ Complete reference for deepWiki MCP server tools for repository documentation Q&
 "OpenCode" never refers to the archived and deprecated "opencode-ai/opencode" github repo. "OpenCode" always refers to "anomalyco/opencode" owned by "anomalyco" in github.
 </important>
 
+## Repository Name Validation
+
+Before calling DeepWiki, validate that the repository name is legitimate and not a GitHub website path.
+
+### Blocked First Segments
+
+**Reject any `owner/repo` where the owner (first segment) matches these:**
+
+```
+about, accelerator, apps, archiveprogram, blog, careers, changelog,
+collections, community, contact, customer-stories, docs, enterprise,
+events, explore, features, gist, github, github-apps, issues, login,
+maintainers, marketplace, mcp, notifications, oauth-apps, orgs,
+organizations, password_reset, press, pricing, pull_requests, pulls,
+resources, security, securitylab, sessions, settings, site-policy,
+skills, solutions, sponsors, support, team, topics, trending,
+trust-center, whitepapers, why-github
+```
+
+### Validation Rules
+
+| Check | Rule | Example |
+|-------|------|---------|
+| Owner format | Alphanumeric, `-`, `_` only | `npm`, `node-js` ✅ |
+| Repo format | Alphanumeric, `-`, `_`, `.` only | `node-semver`, `lib.js` ✅ |
+| Not blocked | Owner not in blocked list | `npm/node-semver` ✅ |
+| Blocked path | Owner in blocked list | `features/spark` ❌ |
+
+### Examples
+
+| Input | Verdict | Reason |
+|-------|---------|--------|
+| `npm/node-semver` | ✅ Valid | `npm` not blocked |
+| `graphology/graphology` | ✅ Valid | `graphology` not blocked |
+| `features/spark` | ❌ Invalid | `features` is GitHub product page |
+| `topics/database` | ❌ Invalid | `topics` is GitHub topic page |
+| `enterprise/startups` | ❌ Invalid | `enterprise` is GitHub marketing |
+| `resources/articles` | ❌ Invalid | `resources` is GitHub content |
+| `github/explore` | ❌ Invalid | `github` is org page, not repo |
+| `site-policy/terms` | ❌ Invalid | `site-policy` is GitHub legal |
+| `orgs/community` | ❌ Invalid | `orgs` is GitHub navigation |
+
 ## Available Tools
 
 ### deepWiki_read_wiki_structure
@@ -119,7 +161,7 @@ Always use `owner/repo` format:
 
 ## Best Practices
 
-1. **Verify repo exists** on GitHub before calling deepWiki
+1. **Validate repo name** against blocked list before calling
 2. **Use `ask_question`** for specific queries (most efficient)
 3. **Use `read_wiki_contents`** only when you need the full documentation
 4. **Check `read_wiki_structure`** first when exploring unfamiliar repos

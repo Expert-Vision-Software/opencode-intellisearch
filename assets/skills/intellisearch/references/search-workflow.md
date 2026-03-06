@@ -1,98 +1,103 @@
-# Web Search Workflow
+# Search Workflow
 
 Tool detection and search strategy for finding GitHub repositories.
 
-## Tool Detection
+## Tool Priority
 
 Before searching, detect available tools:
 
 ```
-1. Check for search tools: websearch, google_search, brave_search, etc.
-2. Check for fetch tools: webfetch, fetch, etc.
-3. Branch based on availability
+IF gh auth status succeeds:
+  → Use gh search repos (PREFERRED - direct API)
+ELSE IF search_tool exists:
+  → Use search tool with keywords (NOT site:github.com)
+ELSE IF fetch_tool exists:
+  → Use URI-based search with engine cycling
+ELSE:
+  → Report: "No search capability available"
+  → fallback to internal knowledge
 ```
 
-## Decision Tree
+## GitHub CLI (Preferred)
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                   AVAILABLE TOOLS                        │
-└─────────────────────────────────────────────────────────┘
-                          │
-                          ▼
-              ┌───────────────────────┐
-              │  Search tools exist?  │
-              └───────────────────────┘
-                    │           │
-                   YES          NO
-                    │           │
-                    ▼           ▼
-         ┌──────────────┐  ┌──────────────────────┐
-         │ Use search   │  │ Use fetch tools with │
-         │ tool directly│  │ URI-based search     │
-         └──────────────┘  └──────────────────────┘
-                    │           │
-                    │           ▼
-                    │    ┌─────────────────────┐
-                    │    │ Cycle: Brave → DDG  │
-                    │    │ → Google            │
-                    │    │ (first success)     │
-                    │    └─────────────────────┘
-                    │           │
-                    └───────────┘
-                          │
-                          ▼
-              ┌───────────────────────┐
-              │  Extract GitHub repos │
-              └───────────────────────┘
+**Detection:**
+```bash
+gh auth status  # Exit 0 = available
 ```
 
-## Search Tool Strategy
+**Search Patterns (try in order):**
 
-When search tools are available, use them directly with operators:
+```bash
+# 1. Full query with topics and language
+gh search repos "{query}" --topic={topics} --language={lang} --json nameWithOwner,stargazersCount,description --limit 10
+
+# 2. Query with language only
+gh search repos "{query}" --language={lang} --json nameWithOwner,stargazersCount,description --limit 10
+
+# 3. Topic-based search (no query string)
+gh search repos --topic={topics} --language={lang} --json nameWithOwner,stargazersCount,description --limit 10
+
+# 4. Broader keyword search
+gh search repos "{query}" --json nameWithOwner,stargazersCount,description --limit 10
+```
+
+**Process:**
+1. Infer topics from query (framework/library names → topics)
+2. Infer language if mentioned
+3. Sort by stargazersCount, return top 5
+4. Skip to DeepWiki query
+
+**Reference:** [gh-cli.md](gh-cli.md)
+
+## Search Tool (Fallback #1)
+
+**DO NOT use `site:github.com`** - it returns full GitHub URLs that get misparsed as repos.
+
+**Instead, search for technology + keywords:**
 
 ```json
-{
-  "query": "site:github.com semver validation typescript"
-}
+{ "query": "{technology} {feature} {language} library package" }
 ```
 
-**Benefits:**
-- Simpler - no URL construction needed
-- Faster - single API call
-- More reliable - no parsing HTML
-
-## URI-Based Search Strategy
-
-When only fetch tools are available, use search engine URLs:
-
-### Search Engine URLs
-
-| Engine | URL Format |
-|--------|------------|
-| Brave | `https://search.brave.com/search?q={terms}` |
-| DuckDuckGo | `https://ddg.gg/?q={terms}` |
-| Google | `https://www.google.com/search?q={terms}` |
-
-### Error Handling
-
-Try each engine in order until one succeeds:
-
-```
-1. Try Brave Search
-   ↓ (on error)
-2. Try DuckDuckGo
-   ↓ (on error)
-3. Try Google Search
-   ↓ (on error)
-4. Report failure
+**Example:**
+```json
+{ "query": "typescript semver validation library npm package" }
 ```
 
-### Example Call
+**From results:**
+- Look for package names in snippets
+- Find `github.com/owner/repo` references in descriptions
+- Ignore navigation/ads
 
+## URI-Based Search (Fallback #2)
+
+When only fetch tools available, cycle through engines:
+
+| Priority | Engine | URL |
+|----------|--------|-----|
+| 1 | Brave | `https://search.brave.com/search?q={terms}` |
+| 2 | DuckDuckGo | `https://duckduckgo.com/?q={terms}` |
+| 3 | Google | `https://www.google.com/search?q={terms}` |
+
+**Error Handling:**
+```
+FOR each engine IN [brave, duckduckgo, google]:
+  result = fetch(engine_url)
+  IF success AND has_search_results:
+    RETURN result
+  CONTINUE
+RETURN error: all engines failed
+```
+
+**Failure Causes:**
+- JavaScript redirects (Google)
+- Captchas (DuckDuckGo)
+- HTML parsing issues
+
+**Example:**
 ```json
 {
-  "url": "https://search.brave.com/search?q=site:github.com%20semver%20validation",
+  "url": "https://search.brave.com/search?q=typescript%20semver%20validation%20library",
   "format": "markdown",
   "timeout": 10
 }
@@ -100,18 +105,24 @@ Try each engine in order until one succeeds:
 
 ## Query Construction
 
-Always include `site:github.com` to target repositories:
-
+**Keyword-based (preferred):**
 ```
-site:github.com {search terms}
-```
-
-**With context:**
-```
-site:github.com {technology} {feature} {language}
+{technology} {feature} {language} library package
 ```
 
-**Example:**
-```
-site:github.com react hooks typescript
-```
+**Examples:**
+- `react hooks typescript library`
+- `semver validation nodejs package`
+- `graph database python library`
+
+**From results, extract repos by:**
+- Looking for `github.com/owner/repo` in snippet descriptions
+- Finding package names that map to known repos
+- Following links in documentation references
+
+## References
+
+- [gh-cli.md](gh-cli.md)
+- [google-search.md](google-search.md)
+- [brave-search.md](brave-search.md)
+- [ddg-search.md](ddg-search.md)

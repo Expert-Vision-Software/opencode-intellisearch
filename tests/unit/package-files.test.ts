@@ -51,9 +51,12 @@ describe("package files validation", () => {
       "utf-8"
     );
 
-    const versionMatch = pluginContent.match(/VERSION\s*=\s*"([^"]+)"/);
-    const pluginVersion = versionMatch?.[1];
+    // The VERSION constant reads from package.json at runtime
+    // Verify the pattern exists that reads from package.json
+    const hasVersionRead = pluginContent.includes('readFile(path.join(import.meta.dirname, "package.json")');
+    expect(hasVersionRead).toBe(true);
 
-    expect(pluginVersion).toBe(packageJson.version);
+    // Verify package.json version exists
+    expect(packageJson.version).toBeDefined();
   });
 });

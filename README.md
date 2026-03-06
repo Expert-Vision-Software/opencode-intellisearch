@@ -55,6 +55,13 @@ Once installed, the plugin automatically adds the `/search-intelligently` comman
 
 - **Bun** - Download from [bun.sh](https://bun.sh/)
 
+### Optional
+
+- **GitHub CLI (`gh`)** - Direct GitHub repository search (preferred when available)
+  - Install from [cli.github.com](https://cli.github.com/)
+  - Run `gh auth login` to authenticate
+  - To opt out: deny `gh` tool permission in OpenCode
+
 ### MCP Servers
 
 **Required:**
@@ -77,12 +84,19 @@ Configure in `~/.config/opencode/opencode.json` or project `opencode.json`:
 
 ## 🧠 How It Works
 
+### Tool Priority
+
+1. **GitHub CLI** (if authenticated) → Direct GitHub API search with topics/language
+2. **Search Tool** (websearch, etc.) → Web search with `site:github.com` operator
+3. **Fetch Tool** (webfetch) → URI-based search with engine cycling (Brave → DDG → Google)
+
 ### Simple Linear Workflow
 
-1. **Search the Web** → Uses webfetch to search for relevant content (prioritizes GitHub repositories)
-2. **Extract Repositories** → Scans search results for GitHub URLs and maps to owner/repo format
-3. **Query DeepWiki** → Uses DeepWiki to ask questions about detected repositories
-4. **Return Results** → Presents authoritative answers from repository documentation and code
+1. **Detect Tools** → Check gh CLI, search tool, or fetch tool availability
+2. **Search Repositories** → Use best available method to find GitHub repositories
+3. **Extract Repositories** → Map results to owner/repo format (skip if gh CLI used)
+4. **Query DeepWiki** → Ask questions about detected repositories
+5. **Return Results** → Present authoritative answers from repository documentation and code
 
 ## 📚 Documentation
 
@@ -140,9 +154,32 @@ bun install
 # Type check
 bun run check
 
+# Run unit tests
+bun test
+
 # Link for local testing
 bun link
 ```
+
+### E2E Testing
+
+The plugin includes comprehensive E2E tests using the OpenCode SDK:
+
+```bash
+# Quick test (explicit mode, 1 run)
+bun test:e2e
+
+# Multiple runs for metrics
+bun test:e2e --runs 3
+
+# Test both skill loading modes
+bun test:e2e --mode both
+
+# Set baseline after changes
+bun test:e2e --set-baseline
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed testing instructions.
 
 ## 📄 License
 

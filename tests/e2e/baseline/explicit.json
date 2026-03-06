@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "generated": "2026-03-06T16:17:02.061Z",
+  "config": {
+    "runs": 2,
+    "model": null,
+    "queryFile": "tests/e2e/test-queries/graph-db-search.md"
+  },
+  "metrics": {
+    "skillLoaded": true,
+    "skillLoadMethod": "explicit",
+    "workflowScore": 0.75,
+    "avgTokens": 21681,
+    "solutionsFound": 4,
+    "searchSuccessRate": 1,
+    "solutions": [
+      "levelgraph",
+      "amark",
+      "graphology",
+      "quadstorejs"
+    ]
+  },
+  "thresholds": {
+    "minWorkflowScore": 0.7,
+    "maxTokenIncrease": 500,
+    "minSolutionsFound": 3
+  },
+  "meta": {
+    "commitHash": "7b6c705b6d29de2566ac71f6b74a657977e6e2f4",
+    "branch": "refactor-testing-protocol",
+    "version": "0.3.4",
+    "mainCommitHash": "9afb170f9231067a57ff8729a0a46da555a74a81"
+  }
+}

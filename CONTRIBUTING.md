@@ -51,6 +51,13 @@ opencode-intellisearch/
 ├── index.ts                     # Plugin re-export
 ├── package.json                 # Bun-native configuration
 ├── tsconfig.json                # Bun TypeScript config
+├── tests/                       # Test suite
+│   ├── unit/                    # Unit tests
+│   └── e2e/                     # E2E tests (SDK-based)
+│       ├── scripts/             # Test runner scripts
+│       ├── baseline/            # Baseline JSON files
+│       ├── results/             # Test results (gitignored)
+│       └── test-queries/        # Test query files
 ├── README.md                    # Main documentation
 ├── CONTRIBUTING.md              # This file
 ├── CHANGELOG.md                 # Version history
@@ -152,6 +159,92 @@ export default plugin;
 bun run check
 ```
 
+### Unit Tests
+
+```bash
+# Run all unit tests
+bun test
+
+# Run with watch mode
+bun run test:watch
+```
+
+### E2E Tests
+
+The plugin includes comprehensive E2E tests that validate skill loading and search capabilities using the OpenCode SDK.
+
+**Quick Test**
+```bash
+bun test:e2e
+```
+
+**Test Commands**
+```bash
+# Explicit mode (default) - uses /search-intelligently command
+bun test:e2e
+
+# Implicit mode - LLM decides to use skill autonomously
+bun test:e2e --mode implicit
+
+# Both modes sequentially
+bun test:e2e --mode both
+
+# Multiple runs for better metrics
+bun test:e2e --runs 3
+
+# Specify model
+bun test:e2e --model "anthropic/claude-3-5-sonnet-20241022"
+```
+
+**Live Output**
+During execution, tool usage is streamed in real-time with cumulative token counts:
+```
+→ 11:09:14 [0] skill: intellisearch
+→ 11:09:14 [15,249] step_finish: 15,249 tokens (15,086 in, 163 out)
+→ 11:09:22 [15,249] bash: gh search "graph database javascript browser"
+→ 11:09:23 [18,264] step_finish: 3,015 tokens (2,843 in, 172 out)
+  ✓ Skill loaded [15,249]
+...
+  Session completed [35,921]
+```
+
+**Skill Modes**
+| Mode       | Description                                       | Use Case                               |
+| ---------- | ------------------------------------------------- | --------------------------------------- |
+| `explicit` | Uses `/search-intelligently` command (default) | Recommended for reliable testing           |
+| `implicit` | LLM autonomously decides to use skill                 | Testing LLM behavior/reliability        |
+
+**Test Results**
+Results are saved to `tests/e2e/results/` with naming pattern `{mode}-{YYMMDD-HHmmss}/`:
+```
+explicit-260306-110914/
+├── run-1-110914/
+│   └── run-metrics.json     # Individual run data
+├── token-metrics.json       # Aggregated token data
+└── consistency-report.json  # Full analysis
+```
+
+**Baseline Management**
+Baselines are stored in `tests/e2e/baseline/`:
+```bash
+# Save current results as baseline
+bun test:e2e --set-baseline
+
+# Save specific results as baseline
+bun test:e2e --set-baseline results/explicit-260306-110914
+```
+
+**Pass Criteria**
+Tests pass if ALL conditions are met:
+1. **Skill loaded**: `true`
+2. **Workflow score**: ≥ 0.70
+3. **No regression**: Token usage stable, solutions found, search success maintained
+
+**Exit Codes**
+- `0`: All tests passed
+- `1`: One or more tests failed
+- `2`: Error occurred
+
 ### Test Locally
 
 ```bash
@@ -200,6 +293,31 @@ bun link opencode-intellisearch
 - Test version skip (existing `.version` marker)
 - Test with different OpenCode versions
 
+### Test Skill Behavior with E2E
+
+The E2E test suite validates the full skill workflow:
+
+```bash
+# Quick validation
+bun test:e2e
+
+# Test both skill loading modes
+bun test:e2e --mode both
+
+# Multiple runs for consistency check
+bun test:e2e --runs 3
+```
+
+The E2E tests automatically:
+1. Create an isolated test project in temp directory
+2. Load the plugin via `file://` path reference
+3. Execute test queries against the skill
+4. Track tool usage and token consumption
+5. Verify skill loading and workflow compliance
+6. Compare results against baseline
+
+For manual testing of specific scenarios, see "Path-Based Testing" below.
+
 ### Test Skill Behavior
 
 1. Install skill
@@ -239,7 +357,20 @@ bun run check
 
 Ensure no TypeScript errors.
 
-### 4. Commit Changes
+### 4. Run Tests
+
+```bash
+# Unit tests
+bun test
+
+# E2E tests (recommended before committing)
+bun test:e2e
+
+# If E2E tests pass, update baseline if needed
+bun test:e2e --set-baseline
+```
+
+### 5. Commit Changes
 
 ```bash
 git add plugin.ts

@@ -13,21 +13,24 @@ Source: https://support.google.com/websearch/answer/2466433?hl=en
 ## Usage Notes
 
 - No spaces between operator and search term: `site:nytimes.com` works, `site: nytimes.com` does not
-- Operators can be combined: `site:github.com "typescirpt" tutorial -paid`
+- Operators can be combined: `"typescript" tutorial -paid`
 - Quotes are useful for exact phrases like `"order of the phoenix"`
 
-## Common Patterns for GitHub Search
+## Common Patterns for Technical Search
 
 ```bash
-# Find repositories
-site:github.com typescript validation
+# Find libraries
+typescript validation library npm
 
 # Exact phrase
-site:github.com "semantic versioning"
+"semantic versioning" nodejs package
 
 # Exclude results
-site:github.com graph database -javascript
+graph database python -javascript
 
 # Combined
-site:github.com semver typescript validation -test
+semver typescript validation -test
+
+# Package search
+npm package semver compare
 ```

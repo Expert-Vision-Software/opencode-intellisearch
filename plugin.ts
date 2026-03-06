@@ -1,8 +1,10 @@
 import type { Plugin } from "@opencode-ai/plugin";
-import { mkdir, readdir, copyFile } from "node:fs/promises";
+import { mkdir, readdir, copyFile, readFile } from "node:fs/promises";
 import path from "node:path";
 
-const VERSION = "0.3.3";
+const VERSION: string = JSON.parse(
+  await readFile(path.join(import.meta.dirname, "package.json"), "utf-8")
+).version;
 
 async function copyDir(src: string, dest: string): Promise<void> {
   await mkdir(dest, { recursive: true });

@@ -50,24 +50,24 @@ Source: https://duckduckgo.com/duckduckgo-help-pages/results/syntax
 - Thousands of bang shortcuts available (see: https://duckduckgo.com/bang)
 - Note: Some advanced syntax may not work correctly on all queries
 
-## Common Patterns for GitHub Search
+## Common Patterns for Technical Search
 
 ```bash
-# Find repositories
-site:github.com typescript validation
+# Find libraries
+typescript validation library
 
 # Exact phrase
-site:github.com "semantic versioning"
+"semantic versioning" npm package
 
 # File type filter
-site:github.com "readme" filetype:md
+"readme" filetype:md tutorial
 
 # Title search
-site:github.com intitle:react hooks
+intitle:react hooks typescript
 
 # Combined
-site:github.com semver -test intitle:library
+semver validation -test intitle:library
 
-# Navigate to first result
-\site:github.com "graph database" go
+# Package search
+nodejs graph database library
 ```

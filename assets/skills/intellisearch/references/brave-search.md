@@ -43,18 +43,21 @@ Source: https://search.brave.com/help/operators
 - Language codes: ISO 639-1 (en, es, fr, etc.)
 - Country codes: ISO 3166-1 alpha-2 (us, ca, gb, etc.)
 
-## Common Patterns for GitHub Search
+## Common Patterns for Technical Search
 
 ```bash
-# Find PDF documentation
-site:github.com "user guide" filetype:pdf
+# Find documentation files
+"user guide" filetype:pdf
 
 # Language-specific results
-site:github.com react hooks lang:en
+react hooks typescript tutorial lang:en
 
 # Combined conditions
-site:github.com typescript validator intitle:library AND loc:us
+typescript validator intitle:library AND loc:us
 
 # Exclude specific results
-site:github.com graph database -mongodb
+graph database library -mongodb
+
+# Package search
+npm package semver validation
 ```

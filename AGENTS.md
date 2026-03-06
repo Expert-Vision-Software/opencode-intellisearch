@@ -34,9 +34,18 @@ bun unlink
 ├── index.ts          # Plugin re-export
 ├── package.json      # Bun-native configuration
 ├── tsconfig.json     # Bun-optimized TypeScript config
-└── tests/            # Bun test suite
+└── tests/            # Test suite
     ├── unit/         # Unit tests
-    └── integration/  # Integration tests
+    └── e2e/          # E2E tests (SDK-based)
+        ├── scripts/
+        │   ├── runner.ts          # Main orchestration
+        │   ├── sdk-runner.ts      # SDK initialization
+        │   ├── event-monitor.ts   # SSE monitoring
+        │   ├── test-project.ts    # Test project setup
+        │   └── __tests__/         # E2E unit tests
+        ├── baseline/              # Baseline JSON files
+        ├── results/               # Test results
+        └── test-queries/          # Test query files
 ```
 
 ## Code Style Guidelines
@@ -111,57 +120,157 @@ docs: update installation for bun-only
 2. Verify assets are in `assets/skills/` and `assets/commands/`
 3. Test locally using bun link workflow
 
-## Testing Protocol
+### E2E Test Runner (SDK-Based)
 
-### Test Project
-Use: `C:\dev\projects\playground\aigpt\test-websearch`
+E2E tests validate the IntelliSearch plugin's skill loading and search capabilities using the OpenCode SDK.
 
-### Quick Test (Path-based - Recommended)
+**Architecture**
+- Uses `@opencode-ai/sdk` for programmatic control
+- Creates isolated test project in temp directory
+- Monitors SSE events for real-time tracking
+- No subprocess spawning - direct SDK integration
 
-This method tests the plugin directly from the source directory without publishing or linking.
-
-1. **Configure OpenCode** - Edit test project's `.opencode/opencode.json`:
-   ```json
-   {
-     "$schema": "https://opencode.ai/config.json",
-     "plugin": ["C:/dev/projects/github/opencode-intellisearch"]
-   }
-   ```
-
-2. **Run Test Command**:
-   ```bash
-   cd C:\dev\projects\playground\aigpt\test-websearch
-   opencode run "test hello"
-   ```
-
-3. **Check Logs**:
-   - Windows: `C:\Users\%USERNAME%\.local\share\opencode\log`
-   - Look for plugin loading and asset installation messages
-
-4. **Verify Assets Installed**:
-   ```bash
-   # Check skills
-   ls .opencode/skills/intellisearch/
-   # Expected: SKILL.md, .version
-   
-    # Check commands
-    ls .opencode/commands/search-intelligently.md
-   ```
-
-5. **Verify Version Marker**:
-   ```bash
-   cat .opencode/skills/intellisearch/.version
-   # Expected: 0.2.0
-   ```
-
-### Cleanup Phase
+**Test Commands**
 ```bash
-# 1. Remove plugin from opencode.json
-# 2. Clean test project assets
-rm -rf C:\dev\projects\playground\aigpt\test-websearch\.opencode\skills\intellisearch
-rm C:\dev\projects\playground\aigpt\test-websearch\.opencode\commands\search-intelligently.md
-# Or simply: rm -rf .opencode/
+# Quick test (explicit mode, 1 run - default)
+bun test:e2e
+
+# Test implicit mode
+bun test:e2e --mode implicit
+
+# Test both modes sequentially
+bun test:e2e --mode both
+
+# Multiple runs for better metrics
+bun test:e2e --runs 3
+
+# Specify model
+bun test:e2e --model "anthropic/claude-3-5-sonnet-20241022"
+
+# Unit tests for SDK runner
+bun test tests/e2e/scripts/__tests__/
 ```
+
+**Skill Modes**
+| Mode       | Description                                       | Use Case                               |
+| ---------- | ------------------------------------------------- | --------------------------------------- |
+| `explicit` | Uses `/search-intelligently` command (default) | Recommended for reliable testing           |
+| `implicit` | LLM autonomously decides to use skill                 | Testing LLM behavior/reliability        |
+| `both`      | Runs both modes sequentially                        | Comprehensive testing                     |
+
+**Live Output Format**
+```
+→ 11:09:14 [0] skill: intellisearch
+→ 11:09:14 [15,249] step_finish: 15,249 tokens (15,086 in, 163 out)
+→ 11:09:22 [15,249] bash: gh search "graph database javascript browser"
+→ 11:09:23 [18,264] step_finish: 3,015 tokens (2,843 in, 172 out)
+  ✓ Skill loaded [15,249]
+...
+  Session completed [35,921]
+```
+The `[X,XXX]` number in yellow is cumulative token count.
+
+**Test Results**
+Results saved to `tests/e2e/results/` with naming pattern `{mode}-{YYMMDD-HHmmss}/`:
+```
+explicit-260306-110914/
+├── run-1-110914/
+│   └── run-metrics.json     # Individual run data
+├── token-metrics.json       # Aggregated token data
+└── consistency-report.json  # Full analysis
+```
+
+**Baseline Management**
+Baselines stored in `tests/e2e/baseline/`:
+- `explicit.json` - Baseline for explicit mode
+- `implicit.json` - Baseline for implicit mode
+
+```bash
+# Save current results as baseline
+bun test:e2e --set-baseline
+
+# Save specific results as baseline
+bun test:e2e --set-baseline results/explicit-260306-110914
+```
+
+**Pass Criteria**
+Tests pass if ALL conditions are met:
+1. **Skill loaded**: `true` (explicit mode) or `true` (implicit mode with skill invocation)
+2. **Workflow score**: ≥ 0.70 (threshold)
+3. **No regression**: Token usage stable, solutions found, search success maintained
+
+**Exit Codes**
+- `0`: All tests passed
+- `1`: One or more tests failed
+- `2`: Error occurred
+
+---
+
+### E2E Test Implementation Details
+
+**Key Files**
+```
+tests/e2e/scripts/
+├── runner.ts          # Main test orchestration (~400 lines)
+├── sdk-runner.ts      # SDK initialization + port finder
+├── event-monitor.ts   # SSE event monitoring
+├── test-project.ts    # Test project directory setup
+├── test.ts            # CLI entry point
+├── types.ts           # TypeScript interfaces
+├── baseline.ts        # Baseline comparison
+├── report.ts          # Console output formatting
+└── __tests__/         # Unit tests
+    └── sdk-runner.test.ts
+```
+
+**Test Project Setup**
+- Creates temp directory: `%TEMP%\opencode-e2e-{timestamp}`
+- Generates `.opencode/opencode.json` with plugin reference
+- Uses `file://` prefix for local plugin path
+- Symlinks (or copies) test-queries directory
+- Cleanup on completion or process exit
+
+**Event Monitoring**
+- Subscribes to SSE via `client.event.subscribe()`
+- Detects session completion via `session.status` event with `status.type === "idle"`
+- Tracks tool calls and token usage from `step-finish` parts
+- Early failure detection: 5 tool calls without skill in explicit mode
+
+**Before Running E2E Tests**
+1. Ensure `bun run check` passes
+2. Clear any processes on ports 4096-5096 if tests hang
+3. Run unit tests first: `bun test tests/e2e/scripts/__tests__/`
+
+---
+
+### Automated Testing (For Agents)
+
+When asked to run E2E tests automatically:
+
+```bash
+# Run explicit mode test (default)
+bun test:e2e
+
+# Run both modes and compare results
+bun test:e2e --mode both
+
+# Run multiple tests and compare metrics
+bun test:e2e --runs 3
+```
+
+**Result Files Include Git Metadata**
+- `commitHash`: Current HEAD commit
+- `branch`: Current branch name
+- `version`: From package.json
+- `mainCommitHash`: origin/main (or origin/master)
+
+### Manual Workflow
+
+1. Run test before commit to get quick feedback
+2. If pass, set baseline with `bun test:e2e --set-baseline`
+3. If fail, investigate results in `tests/e2e/results/`
+4. Fix issues and re-run
+5. Commit changes
 
 ## Helpful Tools
 
