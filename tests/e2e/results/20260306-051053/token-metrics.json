@@ -1,0 +1,47 @@
+{
+  "generated": "2026-03-06T10:20:09.280Z",
+  "runCount": 3,
+  "averages": {
+    "inputTokens": 7457,
+    "outputTokens": 1030,
+    "totalTokens": 8487
+  },
+  "runs": [
+    {
+      "timestamp": "run-1-20260306-051053",
+      "inputTokens": 18635,
+      "outputTokens": 1159,
+      "totalTokens": 19794,
+      "logPath": "C:\\dev\\projects\\github\\opencode-intellisearch\\tests\\e2e\\results\\20260306-051053\\run-1-20260306-051053\\output.json",
+      "skillLoaded": true,
+      "skillLoadMethod": "explicit",
+      "toolsUsed": [
+        "task"
+      ]
+    },
+    {
+      "timestamp": "run-2-20260306-051338",
+      "inputTokens": 2248,
+      "outputTokens": 993,
+      "totalTokens": 3241,
+      "logPath": "C:\\dev\\projects\\github\\opencode-intellisearch\\tests\\e2e\\results\\20260306-051053\\run-2-20260306-051338\\output.json",
+      "skillLoaded": true,
+      "skillLoadMethod": "explicit",
+      "toolsUsed": [
+        "task"
+      ]
+    },
+    {
+      "timestamp": "run-3-20260306-051641",
+      "inputTokens": 1487,
+      "outputTokens": 938,
+      "totalTokens": 2425,
+      "logPath": "C:\\dev\\projects\\github\\opencode-intellisearch\\tests\\e2e\\results\\20260306-051053\\run-3-20260306-051641\\output.json",
+      "skillLoaded": true,
+      "skillLoadMethod": "explicit",
+      "toolsUsed": [
+        "task"
+      ]
+    }
+  ]
+}

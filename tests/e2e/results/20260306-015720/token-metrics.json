@@ -1,0 +1,23 @@
+{
+  "generated": "2026-03-06T06:59:50.967Z",
+  "runCount": 1,
+  "averages": {
+    "inputTokens": 82582,
+    "outputTokens": 3000,
+    "totalTokens": 85582
+  },
+  "runs": [
+    {
+      "timestamp": "run-1-20260306-015720",
+      "inputTokens": 82582,
+      "outputTokens": 3000,
+      "totalTokens": 85582,
+      "logPath": "C:\\dev\\projects\\github\\opencode-intellisearch\\tests\\e2e\\results\\20260306-015720\\run-1-20260306-015720\\output.json",
+      "skillLoaded": false,
+      "skillLoadMethod": "none",
+      "toolsUsed": [
+        "webfetch"
+      ]
+    }
+  ]
+}

@@ -1,13 +1,19 @@
 #!/usr/bin/env pwsh
 # Isolated E2E Test Runner for IntelliSearch Plugin
-# Usage: ./run-isolated-test.ps1 -Runs 3 -Model "minimax/MiniMax-M2.5" -PluginSource "C:/path/to/plugin"
+# Usage: ./run-isolated-test.ps1 -Runs 3 -PluginSource "C:/path/to/plugin" -SkillMode "explicit"
+#
+# SkillMode options:
+#   - explicit (default): Forces skill via /search-intelligently command
+#   - implicit: LLM autonomously decides to load intellisearch skill
 
 param(
     [int]$Runs = 3,
     [string]$PluginSource = $PWD,
     [string]$ProjectDir = $PWD,
     [string]$QueryFile = "./tests/e2e/test-queries/graph-db-search.md",
-    [string]$Model = "minimax/MiniMax-M2.5"
+    [string]$Model = "",
+    [ValidateSet("implicit", "explicit")]
+    [string]$SkillMode = "explicit"
 )
 
 $ErrorActionPreference = "Stop"
@@ -20,7 +26,8 @@ $BatchDir = Join-Path $ResultsBaseDir $BatchTimestamp
 Write-Host "=== IntelliSearch E2E Test Runner ===" -ForegroundColor Cyan
 Write-Host "Batch: $BatchTimestamp"
 Write-Host "Runs: $Runs"
-Write-Host "Model: $Model"
+Write-Host "Model: $(if ($Model) { $Model } else { '<default>' })"
+Write-Host "SkillMode: $SkillMode"
 Write-Host "Plugin: $PluginSource"
 Write-Host ""
 
@@ -100,9 +107,13 @@ for ($i = 1; $i -le $Runs; $i++) {
     
     Write-Host "  Running opencode..."
     
+    $FinalQuery = if ($SkillMode -eq "explicit") { "/search-intelligently $Query" } else { $Query }
+    
+    $ModelArg = if ($Model) { "--model", $Model } else { @() }
+    
     Push-Location $ProjectDir
     try {
-        opencode run $Query --format json --model $Model 2>&1 | Tee-Object -FilePath $LogFile | Out-File -FilePath $OutputFile
+        & opencode run $FinalQuery --format json @ModelArg 2>&1 | Tee-Object -FilePath $LogFile | Out-File -FilePath $OutputFile
     }
     catch {
         Write-Warning "Run $i failed: $_"
