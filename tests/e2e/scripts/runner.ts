@@ -69,7 +69,13 @@ async function runSingleTest(
   let monitor: EventMonitor | null = null;
   
   try {
-    context = await initializeSDKTest(config);
+    context = await initializeSDKTest({
+      ...config,
+      sdk: {
+        ...config.sdk,
+        port: (config.sdk?.port ?? 4096) + runIndex,
+      },
+    });
     console.log(`  Session ID: ${context.sessionId}`);
     
     monitor = await createEventMonitor(context.client, context.sessionId, config);
@@ -160,38 +166,26 @@ async function runSingleTest(
   }
 }
 
-async function saveRunMetrics(runDir: string, metrics: RunMetrics): Promise<void> {
-  await writeFile(join(runDir, "run-metrics.json"), JSON.stringify(metrics, null, 2));
-}
-
-async function loadRunMetrics(runDir: string): Promise<RunMetrics | null> {
-  const file = Bun.file(join(runDir, "run-metrics.json"));
-  if (!(await file.exists())) {
-    return null;
-  }
-  try {
-    return await file.json() as RunMetrics;
-  } catch {
-    return null;
-  }
-}
-
-export async function loadRunsFromDirectory(resultsDir: string): Promise<RunMetrics[]> {
+export async function runTests(config: TestConfig): Promise<{ metrics: AggregatedMetrics; resultsDir: string }> {
+  const meta = await collectGitMetadata(config.projectDir);
+  const resultsDirName = generateResultsDirName(config.mode);
+  const resultsDir = join(config.projectDir, "tests/e2e/results", resultsDirName);
+  await mkdir(resultsDir, { recursive: true });
+  
   const runs: RunMetrics[] = [];
-  const entries = await Array.fromAsync(new Bun.Glob("run-*").scan({ cwd: resultsDir }));
   
-  for (const entry of entries) {
-    const runDir = join(resultsDir, entry);
-    const metrics = await loadRunMetrics(runDir);
-    if (metrics) {
-      runs.push(metrics);
-    }
+  for (let i = 0; i < config.runs; i++) {
+    console.log(`\nRunning test ${i + 1}/${config.runs}...`);
+    
+    const runTimestamp = Date.now();
+    const runDirName = `run-${i + 1}-${runTimestamp}`;
+    const runDir = join(resultsDir, runDirName);
+    await mkdir(runDir, { recursive: true });
+    
+    const metrics = await runSingleTest(config, i + 1, runDir);
+    runs.push(metrics);
   }
   
-  return runs.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
-}
-
-function computeAggregatedMetrics(runs: RunMetrics[], meta: GitMetadata): AggregatedMetrics {
   const avgTokens = Math.round(
     runs.reduce((sum, r) => sum + r.totalTokens, 0) / runs.length
   );
@@ -215,7 +209,7 @@ function computeAggregatedMetrics(runs: RunMetrics[], meta: GitMetadata): Aggreg
     ? (skillLoadMethods.has("explicit") ? "explicit" : "implicit")
     : "none";
   
-  return {
+  const aggregated: AggregatedMetrics = {
     skillLoaded,
     skillLoadMethod,
     avgTokens,
@@ -226,36 +220,11 @@ function computeAggregatedMetrics(runs: RunMetrics[], meta: GitMetadata): Aggreg
     runs,
     meta
   };
-}
-
-export async function runTests(config: TestConfig): Promise<{ metrics: AggregatedMetrics; resultsDir: string }> {
-  const meta = await collectGitMetadata(config.projectDir);
-  const resultsDirName = generateResultsDirName(config.mode);
-  const resultsDir = join(config.projectDir, "tests/e2e/results", resultsDirName);
-  await mkdir(resultsDir, { recursive: true });
   
-  const runs: RunMetrics[] = [];
-  let aggregated: AggregatedMetrics | null = null;
+  await saveTokenMetrics(resultsDir, aggregated);
+  await saveConsistencyReport(resultsDir, aggregated);
   
-  for (let i = 0; i < config.runs; i++) {
-    console.log(`\nRunning test ${i + 1}/${config.runs}...`);
-    
-    const runTimestamp = Date.now();
-    const runDirName = `run-${i + 1}-${runTimestamp}`;
-    const runDir = join(resultsDir, runDirName);
-    await mkdir(runDir, { recursive: true });
-    
-    const metrics = await runSingleTest(config, i + 1, runDir);
-    runs.push(metrics);
-    
-    await saveRunMetrics(runDir, metrics);
-    
-    aggregated = computeAggregatedMetrics(runs, meta);
-    await saveTokenMetrics(resultsDir, aggregated);
-    await saveConsistencyReport(resultsDir, aggregated);
-  }
-  
-  return { metrics: aggregated!, resultsDir };
+  return { metrics: aggregated, resultsDir };
 }
 
 async function saveTokenMetrics(resultsDir: string, metrics: AggregatedMetrics): Promise<void> {
@@ -356,38 +325,28 @@ export async function loadResultsDir(resultsDir: string): Promise<AggregatedMetr
   const reportPath = join(resultsDir, "consistency-report.json");
   const file = Bun.file(reportPath);
   
-  if (await file.exists()) {
-    try {
-      const report = await file.json() as ConsistencyReport;
-      
-      return {
-        skillLoaded: report.skillMetrics.loadedCount === report.runCount,
-        skillLoadMethod: report.skillMetrics.explicitCount > 0 ? "explicit" : 
-                         report.skillMetrics.implicitCount > 0 ? "implicit" : "none",
-        avgTokens: report.tokenMetrics.average,
-        workflowScore: report.workflowCompliance.averageScore,
-        solutionsFound: report.consistency.allSolutions.length,
-        searchSuccessRate: report.searchSuccessRate,
-        solutions: report.consistency.allSolutions,
-        runs: report.runs,
-        meta: report.meta
-      };
-    } catch {}
-  }
-  
-  const runs = await loadRunsFromDirectory(resultsDir);
-  if (runs.length === 0) {
+  if (!(await file.exists())) {
     return null;
   }
   
-  const meta: GitMetadata = {
-    commitHash: "",
-    branch: "",
-    version: "",
-    mainCommitHash: ""
-  };
-  
-  return computeAggregatedMetrics(runs, meta);
+  try {
+    const report = await file.json() as ConsistencyReport;
+    
+    return {
+      skillLoaded: report.skillMetrics.loadedCount === report.runCount,
+      skillLoadMethod: report.skillMetrics.explicitCount > 0 ? "explicit" : 
+                       report.skillMetrics.implicitCount > 0 ? "implicit" : "none",
+      avgTokens: report.tokenMetrics.average,
+      workflowScore: report.workflowCompliance.averageScore,
+      solutionsFound: report.consistency.allSolutions.length,
+      searchSuccessRate: report.searchSuccessRate,
+      solutions: report.consistency.allSolutions,
+      runs: report.runs,
+      meta: report.meta
+    };
+  } catch {
+    return null;
+  }
 }
 
 export function getDefaultConfig(projectDir: string): TestConfig {

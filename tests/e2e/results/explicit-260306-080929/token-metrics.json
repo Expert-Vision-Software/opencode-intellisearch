@@ -1,0 +1,45 @@
+{
+  "generated": "2026-03-06T13:12:34.860Z",
+  "runCount": 1,
+  "averages": {
+    "inputTokens": 29123,
+    "outputTokens": 3799,
+    "totalTokens": 32922
+  },
+  "meta": {
+    "commitHash": "436dadfe7a44648cb5de35187e16710abfb08573",
+    "branch": "436dadf",
+    "version": "0.3.4",
+    "mainCommitHash": "9afb170f9231067a57ff8729a0a46da555a74a81"
+  },
+  "runs": [
+    {
+      "timestamp": "run-1-1772802754859",
+      "inputTokens": 29123,
+      "outputTokens": 3799,
+      "totalTokens": 32922,
+      "skillLoaded": true,
+      "skillLoadMethod": "explicit",
+      "toolsUsed": [
+        "task",
+        "skill",
+        "read",
+        "bash",
+        "DeepWiki_ask_question"
+      ],
+      "workflowCompliance": {
+        "usedGhCli": false,
+        "usedDeepWiki": true,
+        "usedWebfetch": false,
+        "usedWebfetchOnGithub": false,
+        "score": 0.75
+      },
+      "solutions": [
+        "amark",
+        "alasql",
+        "levelgraph"
+      ],
+      "searchSuccess": true
+    }
+  ]
+}

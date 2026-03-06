@@ -14,6 +14,11 @@ export interface TestConfig {
   queryFile: string;
   pluginSource: string;
   projectDir: string;
+  sdk?: {
+    hostname?: string;
+    port?: number;
+    timeout?: number;
+  };
 }
 
 export interface WorkflowCompliance {

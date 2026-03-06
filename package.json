@@ -27,7 +27,8 @@
     "test:e2e:baseline": "bun tests/e2e/scripts/test.ts --set-baseline"
   },
   "dependencies": {
-    "@opencode-ai/plugin": "*"
+    "@opencode-ai/plugin": "*",
+    "@opencode-ai/sdk": "^1.2.20"
   },
   "devDependencies": {
     "@types/bun": "latest",

@@ -1,0 +1,43 @@
+{
+  "generated": "2026-03-06T12:37:20.709Z",
+  "runCount": 1,
+  "averages": {
+    "inputTokens": 44222,
+    "outputTokens": 2505,
+    "totalTokens": 46727
+  },
+  "meta": {
+    "commitHash": "436dadfe7a44648cb5de35187e16710abfb08573",
+    "branch": "436dadf",
+    "version": "0.3.4",
+    "mainCommitHash": "9afb170f9231067a57ff8729a0a46da555a74a81"
+  },
+  "runs": [
+    {
+      "timestamp": "run-1-1772800640708",
+      "inputTokens": 44222,
+      "outputTokens": 2505,
+      "totalTokens": 46727,
+      "skillLoaded": true,
+      "skillLoadMethod": "explicit",
+      "toolsUsed": [
+        "task",
+        "webfetch",
+        "DeepWiki_ask_question"
+      ],
+      "workflowCompliance": {
+        "usedGhCli": false,
+        "usedDeepWiki": true,
+        "usedWebfetch": true,
+        "usedWebfetchOnGithub": true,
+        "score": 0.55
+      },
+      "solutions": [
+        "amark",
+        "pubkey",
+        "dexie"
+      ],
+      "searchSuccess": true
+    }
+  ]
+}

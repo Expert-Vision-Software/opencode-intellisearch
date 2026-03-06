@@ -1,29 +1,22 @@
 {
   "version": 1,
-  "generated": "2026-03-06T09:36:17.700Z",
+  "generated": "2026-03-06T13:25:30.748Z",
   "config": {
     "runs": 1,
     "model": null,
     "queryFile": "tests/e2e/test-queries/graph-db-search.md"
   },
   "metrics": {
-    "skillLoaded": false,
-    "skillLoadMethod": "none",
-    "workflowScore": 0.45,
-    "avgTokens": 28825,
-    "solutionsFound": 51,
-    "searchSuccessRate": 0,
+    "skillLoaded": true,
+    "skillLoadMethod": "explicit",
+    "workflowScore": 0.55,
+    "avgTokens": 42866,
+    "solutionsFound": 3,
+    "searchSuccessRate": 1,
     "solutions": [
-      "level",
-      "features",
-      "security",
-      "enterprise",
-      "solutions",
-      "resources",
-      "orgs",
-      "search-github",
-      "github",
-      "topics"
+      "levelgraph",
+      "quadstorejs",
+      "joshuaamaju"
     ]
   },
   "thresholds": {
@@ -32,8 +25,8 @@
     "minSolutionsFound": 3
   },
   "meta": {
-    "commitHash": "f3df3f773afc57554f39c0baa31dc146d11fef45",
-    "branch": "refactor-testing-protocol",
+    "commitHash": "436dadfe7a44648cb5de35187e16710abfb08573",
+    "branch": "436dadf",
     "version": "0.3.4",
     "mainCommitHash": "9afb170f9231067a57ff8729a0a46da555a74a81"
   }
