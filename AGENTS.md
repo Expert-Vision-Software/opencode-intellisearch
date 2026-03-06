@@ -111,48 +111,140 @@ docs: update installation for bun-only
 2. Verify assets are in `assets/skills/` and `assets/commands/`
 3. Test locally using bun link workflow
 
-## Testing Protocol
+### E2E Test Runner (TypeScript)
 
-### Test Project
-Use: `C:\dev\projects\playground\aigpt\test-websearch`
+E2E tests validate the IntelliSearch plugin's skill loading and search capabilities across different skill loading modes
 
-### Quick Test (Path-based - Recommended)
+**Test Commands**
+```bash
+# Quick test (explicit mode, 1 run - default)
+bun test:e2e
 
-This method tests the plugin directly from the source directory without publishing or linking.
+# Test implicit mode
+bun test:e2e --mode implicit
 
-1. **Configure OpenCode** - Edit test project's `.opencode/opencode.json`:
-   ```json
-   {
-     "$schema": "https://opencode.ai/config.json",
-     "plugin": ["C:/dev/projects/github/opencode-intellisearch"]
-   }
-   ```
+# Test both modes sequentially
+bun test:e2e --mode both
 
-2. **Run Test Command**:
-   ```bash
-   cd C:\dev\projects\playground\aigpt\test-websearch
-   opencode run "test hello"
-   ```
+# Multiple runs for better metrics
+bun test:e2e --runs 3
 
-3. **Check Logs**:
-   - Windows: `C:\Users\%USERNAME%\.local\share\opencode\log`
-   - Look for plugin loading and asset installation messages
+# Specify model
+bun test:e2e --model "minimax/MiniMax-M2.5"
+```
 
-4. **Verify Assets Installed**:
-   ```bash
-   # Check skills
-   ls .opencode/skills/intellisearch/
-   # Expected: SKILL.md, .version
-   
-    # Check commands
-    ls .opencode/commands/search-intelligently.md
-   ```
+**Skill Modes**
+| Mode       | Description                                       | Use Case                               |
+| ---------- | ------------------------------------------------- | --------------------------------------- |
+| `explicit` | Uses `/search-intelligently` command (default) | Recommended for reliable testing           |
+| `implicit` | LLM autonomously decides to use skill                 | Testing LLM behavior/reliability        |
+| `both`      | Runs both modes sequentially                        | Comprehensive testing                     |
 
-5. **Verify Version Marker**:
-   ```bash
-   cat .opencode/skills/intellisearch/.version
-   # Expected: 0.2.0
-   ```
+**Test Results**
+Results are saved to `tests/e2e/results/` with naming pattern:
+```
+{mode}-{YYMMDD-HHmmss}/
+
+Example: `explicit-260306-143205/`
+```
+├── run-1-143205/
+│   ├── output.json         # Raw opencode output
+│   ├── token-metrics.json      # Aggregated token data
+│   └── consistency-report.json # Full analysis
+```
+
+**Baseline Management**
+Baselines are committed to `tests/e2e/baseline/` as JSON files:
+- `explicit.json` - Baseline for explicit mode
+- `implicit.json` - Baseline for implicit mode
+
+```bash
+# Save current results as baseline
+bun test:e2e --set-baseline
+
+# Save specific results as baseline
+bun test:e2e --set-baseline results/explicit-260306-143205
+```
+
+**Re-analyzing Results**
+Regenerate reports from existing results without re-running
+```bash
+bun test:e2e --analyze results/explicit-260306-143205
+```
+
+**Pass Criteria**
+Tests pass if ALL conditions are met:
+1. **Skill loaded**: `true` (explicit mode) or `true` (implicit mode with skill invocation)
+2. **Workflow score**: ≥ 0.70 (threshold)
+3. **No regression**: Token usage stable, solutions found, search success maintained
+
+**Exit Codes**
+- `0`: All tests passed
+- `1`: One or more tests failed
+- `2`: Error occurred
+
+---
+
+### Automated Testing (For Agents)
+
+When asked to run E2E tests automatically
+
+```bash
+# Run explicit mode test (default)
+bun test:e2e
+
+# Run both modes and compare results
+bun test:e2e --mode both
+
+# Run multiple tests and compare metrics
+bun test:e2e --runs 3
+```
+
+**Live Feedback**
+During test execution, tool usage is streamed to console in real-time
+```
+→ 14:32:05 skill: intellisearch
+  → 14:32:08 bash: gh search repos "graph database javascript"
+  → 14:32:12 DeepWiki_ask_question: levelgraph/levelgraph
+  → 14:32:18 step_finish: 2,145 tokens (1,855 in, 290 out)
+```
+
+**Result Files**
+All result files include git metadata:
+- `commitHash`: Current HEAD commit
+- `branch`: Current branch name
+- `version`: From package.json
+- `mainCommitHash`: origin/main (or origin/master)
+
+**Example output.json**
+```json
+{
+  "generated": "2026-03-06T14:32:05.000Z",
+  "runCount": 1,
+  "averages": {
+    "inputTokens": 1855,
+    "outputTokens": 290,
+    "totalTokens": 2145
+  },
+  "meta": {
+    "commitHash": "abc1234",
+    "branch": "ai-e2e-testing",
+    "version": "0.3.4",
+    "mainCommitHash": "def5678"
+  },
+  "runs": [...]
+}
+```
+
+### Manual Workflow
+
+1. Run test before commit to get quick feedback
+2. If pass, set baseline
+3. If fail, investigate results
+4. Fix issues and re-run
+5. Commit changes
+
+---
 
 ### Cleanup Phase
 ```bash

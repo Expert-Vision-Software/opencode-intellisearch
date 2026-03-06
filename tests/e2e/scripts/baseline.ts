@@ -55,7 +55,8 @@ export async function saveBaseline(
       searchSuccessRate: metrics.searchSuccessRate,
       solutions: metrics.solutions.slice(0, 10)
     },
-    thresholds: DEFAULT_THRESHOLDS
+    thresholds: DEFAULT_THRESHOLDS,
+    meta: metrics.meta
   };
   
   const path = getBaselinePath(projectDir, mode);

@@ -1,14 +1,17 @@
-import { resolve } from "node:path";
+import { resolve, basename } from "node:path";
+import { stat } from "node:fs/promises";
 import type { SkillMode, TestConfig } from "./types.ts";
-import { runTests, getDefaultConfig } from "./runner.ts";
+import { runTests, getDefaultConfig, loadResultsDir } from "./runner.ts";
 import { loadBaseline, saveBaseline, evaluateResult } from "./baseline.ts";
-import { printHeader, printResult, printError, printInfo, printBaselineSaved } from "./report.ts";
+import { printHeader, printResult, printError, printBaselineSaved, printResultsPath } from "./report.ts";
 
 interface CliArgs {
   mode: SkillMode | "both";
   runs: number;
   model: string | null;
   setBaseline: boolean;
+  baselinePath: string | null;
+  analyze: string | null;
   help: boolean;
 }
 
@@ -18,6 +21,8 @@ function parseArgs(args: string[]): CliArgs {
     runs: 1,
     model: null,
     setBaseline: false,
+    baselinePath: null,
+    analyze: null,
     help: false
   };
   
@@ -34,7 +39,7 @@ function parseArgs(args: string[]): CliArgs {
         throw new Error(`Invalid mode: ${value}. Use: explicit, implicit, or both`);
       }
     } else if (arg === "--runs" || arg === "-r") {
-      result.runs = parseInt(args[++i], 10);
+      result.runs = parseInt(args[++i] ?? "1", 10);
       if (isNaN(result.runs) || result.runs < 1) {
         throw new Error("Runs must be a positive integer");
       }
@@ -42,6 +47,13 @@ function parseArgs(args: string[]): CliArgs {
       result.model = args[++i] ?? null;
     } else if (arg === "--set-baseline" || arg === "-b") {
       result.setBaseline = true;
+      const next = args[i + 1];
+      if (next && !next.startsWith("-")) {
+        result.baselinePath = next;
+        i++;
+      }
+    } else if (arg === "--analyze" || arg === "-a") {
+      result.analyze = args[++i] ?? null;
     }
   }
   
@@ -55,46 +67,122 @@ E2E Test Runner for IntelliSearch Plugin
 Usage: bun test:e2e [options]
 
 Options:
-  -m, --mode <mode>      Test mode: explicit, implicit, or both (default: explicit)
-  -r, --runs <n>         Number of test runs (default: 1)
-  --model <model>        Model to use (default: pre-configured)
-  -b, --set-baseline     Save results as new baseline
-  -h, --help             Show this help
+  -m, --mode <mode>        Test mode: explicit, implicit, or both (default: explicit)
+  -r, --runs <n>           Number of test runs (default: 1)
+  --model <model>          Model to use (default: pre-configured)
+  -b, --set-baseline       Save results as new baseline
+                           Optionally provide path to existing results dir
+  -a, --analyze <dir>      Re-analyze existing results
+  -h, --help               Show this help
 
 Examples:
-  bun test:e2e                      # Quick test, explicit mode
-  bun test:e2e --mode implicit      # Test implicit mode
-  bun test:e2e --mode both          # Test both modes
-  bun test:e2e --runs 3             # Run 3 times for better metrics
-  bun test:e2e --set-baseline       # Save current results as baseline
+  bun test:e2e                                  # Quick test (explicit mode)
+  bun test:e2e --mode implicit                  # Test implicit mode
+  bun test:e2e --mode both                      # Test both modes
+  bun test:e2e --runs 3                         # Multiple runs
+  bun test:e2e --set-baseline                   # Save current as baseline
+  bun test:e2e --set-baseline results/explicit-260306-143205
+  bun test:e2e --analyze results/explicit-260306-143205
 `);
+}
+
+async function dirExists(path: string): Promise<boolean> {
+  try {
+    const s = await stat(path);
+    return s.isDirectory();
+  } catch {
+    return false;
+  }
 }
 
 async function runSingleMode(
   mode: SkillMode, 
   config: TestConfig, 
   setBaseline: boolean
-): Promise<boolean> {
-  printHeader(mode, config.runs, config.model);
-  
+): Promise<{ passed: boolean; resultsDir: string }> {
   const testConfig: TestConfig = { ...config, mode };
   
-  const metrics = await runTests(testConfig);
+  printHeader(mode, testConfig.runs, testConfig.model);
+  
+  const { metrics, resultsDir } = await runTests(testConfig);
+  
+  if (setBaseline) {
+    await saveBaseline(
+      config.projectDir,
+      mode,
+      metrics,
+      { runs: config.runs, model: config.model, queryFile: config.queryFile }
+    );
+    printBaselineSaved(mode);
+  }
+  
   const baseline = await loadBaseline(config.projectDir, mode);
   const result = evaluateResult(metrics, baseline);
   
-  if (setBaseline) {
-    await saveBaseline(config.projectDir, mode, metrics, {
-      runs: config.runs,
-      model: config.model,
-      queryFile: config.queryFile
-    });
-    printBaselineSaved(mode);
-    return true;
+  printResult(result);
+  printResultsPath(resultsDir);
+  
+  return { passed: result.passed, resultsDir };
+}
+
+async function analyzeResults(resultsPath: string, projectDir: string): Promise<boolean> {
+  const resolvedPath = resolve(projectDir, resultsPath);
+  
+  if (!(await dirExists(resolvedPath))) {
+    printError(`Results directory not found: ${resolvedPath}`);
+    return false;
   }
   
+  const dirName = basename(resolvedPath);
+  const modeMatch = dirName.match(/^(explicit|implicit)-/);
+  const mode: SkillMode = modeMatch ? (modeMatch[1] as SkillMode) : "explicit";
+  
+  console.log(`Re-analyzing results from: ${resolvedPath}`);
+  
+  const metrics = await loadResultsDir(resolvedPath);
+  
+  if (!metrics) {
+    printError("Failed to load results");
+    return false;
+  }
+  
+  const baseline = await loadBaseline(projectDir, mode);
+  const result = evaluateResult(metrics, baseline);
+  
   printResult(result);
+  
   return result.passed;
+}
+
+async function setBaselineFromPath(resultsPath: string, projectDir: string): Promise<boolean> {
+  const resolvedPath = resolve(projectDir, resultsPath);
+  
+  if (!(await dirExists(resolvedPath))) {
+    printError(`Results directory not found: ${resolvedPath}`);
+    return false;
+  }
+  
+  const metrics = await loadResultsDir(resolvedPath);
+  
+  if (!metrics) {
+    printError("Failed to load results");
+    return false;
+  }
+  
+  const dirName = basename(resolvedPath);
+  const modeMatch = dirName.match(/^(explicit|implicit)-/);
+  const mode: SkillMode = modeMatch ? (modeMatch[1] as SkillMode) : "explicit";
+  
+  await saveBaseline(
+    projectDir,
+    mode,
+    metrics,
+    { runs: metrics.runs.length, model: null, queryFile: "tests/e2e/test-queries/graph-db-search.md" }
+  );
+  
+  printBaselineSaved(mode);
+  
+  return true;
 }
 
 async function main(): Promise<void> {
@@ -105,28 +193,44 @@ async function main(): Promise<void> {
     process.exit(0);
   }
   
-  const projectDir = resolve(import.meta.dirname, "..", "..", "..");
-  const config: TestConfig = {
-    ...getDefaultConfig(projectDir),
-    runs: args.runs,
-    model: args.model
-  };
+  const projectDir = process.cwd();
+  const config = getDefaultConfig(projectDir);
+  
+  config.runs = args.runs;
+  config.model = args.model;
   
   try {
+    if (args.analyze) {
+      const passed = await analyzeResults(args.analyze, projectDir);
+      process.exit(passed ? 0 : 1);
+      return;
+    }
+    
+    if (args.setBaseline && args.baselinePath) {
+      const success = await setBaselineFromPath(args.baselinePath, projectDir);
+      process.exit(success ? 0 : 1);
+      return;
+    }
+    
     let allPassed = true;
     
     if (args.mode === "both") {
-      allPassed = await runSingleMode("explicit", config, args.setBaseline) && allPassed;
+      const explicitResult = await runSingleMode("explicit", config, args.setBaseline);
+      allPassed = explicitResult.passed && allPassed;
+      
       console.log("");
-      allPassed = await runSingleMode("implicit", config, args.setBaseline) && allPassed;
+      
+      const implicitResult = await runSingleMode("implicit", config, args.setBaseline);
+      allPassed = implicitResult.passed && allPassed;
     } else {
-      allPassed = await runSingleMode(args.mode, config, args.setBaseline);
+      const result = await runSingleMode(args.mode, config, args.setBaseline);
+      allPassed = result.passed;
     }
     
     process.exit(allPassed ? 0 : 1);
   } catch (error) {
     printError((error as Error).message);
-    process.exit(1);
+    process.exit(2);
   }
 }
 

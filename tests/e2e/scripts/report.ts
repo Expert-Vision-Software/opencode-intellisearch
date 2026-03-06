@@ -1,5 +1,4 @@
 import type { TestResult, SkillMode, AggregatedMetrics, Baseline } from "./types.ts";
-import { formatDelta } from "./baseline.ts";
 
 const COLORS = {
   reset: "\x1b[0m",
@@ -21,6 +20,56 @@ function formatBool(value: boolean): string {
 
 function formatPercent(value: number): string {
   return `${Math.round(value * 100)}%`;
+}
+
+function formatTimestamp(ts: number | undefined): string {
+  if (!ts) return new Date().toTimeString().slice(0, 8);
+  return new Date(ts).toTimeString().slice(0, 8);
+}
+
+export function printToolUse(tool: string, input: Record<string, unknown>, timestamp?: number): void {
+  const time = formatTimestamp(timestamp);
+  let detail = "";
+  
+  switch (tool) {
+    case "skill":
+      detail = String(input.name || "");
+      break;
+    case "bash": {
+      const cmd = String(input.command || "");
+      const ghMatch = cmd.match(/gh\s+(?:search|repo)\s+(?:repos\s+)?["']?([^"']+)["']?/);
+      detail = ghMatch ? `gh search "${ghMatch[1]}"` : "gh command";
+      break;
+    }
+    case "DeepWiki_ask_question":
+      detail = String(input.repoName || input.question || "");
+      break;
+    case "DeepWiki_read_wiki_structure":
+    case "DeepWiki_read_wiki_contents":
+      detail = String(input.repoName || "");
+      break;
+    case "webfetch": {
+      const url = String(input.url || "");
+      const shortUrl = url.replace(/^https?:\/\//, "").slice(0, 50);
+      detail = shortUrl.length < url.length ? shortUrl + "..." : shortUrl;
+      break;
+    }
+    case "task": {
+      const cmd = String(input.command || input.prompt || "");
+      detail = cmd.split("\n")[0]?.slice(0, 40) || "subtask";
+      break;
+    }
+    default:
+      detail = "";
+  }
+  
+  console.log(`  → ${color(time, "dim")} ${color(tool, "cyan")}: ${detail}`);
+}
+
+export function printStepFinish(tokens: { input: number; output: number }, timestamp?: number): void {
+  const time = formatTimestamp(timestamp);
+  const total = tokens.input + tokens.output;
+  console.log(`  → ${color(time, "dim")} ${color("step_finish", "green")}: ${total.toLocaleString()} tokens (${tokens.input.toLocaleString()} in, ${tokens.output.toLocaleString()} out)`);
 }
 
 export function printHeader(mode: SkillMode, runs: number, model: string | null): void {
@@ -127,6 +176,13 @@ function printMetricsOnly(metrics: AggregatedMetrics): void {
   console.log(`Search Success:   ${formatPercent(metrics.searchSuccessRate)}`);
 }
 
+function formatDelta(current: number, baselineVal: number): string {
+  const diff = current - baselineVal;
+  if (Math.abs(diff) < 0.001) return "=";
+  if (diff > 0) return `+${diff.toFixed(diff < 1 ? 2 : 0)} ↑`;
+  return `${diff.toFixed(diff > -1 ? 2 : 0)} ↓`;
+}
+
 export function printError(message: string): void {
   console.error(color(`Error: ${message}`, "red"));
 }
@@ -137,4 +193,29 @@ export function printInfo(message: string): void {
 
 export function printBaselineSaved(mode: SkillMode): void {
   console.log(color(`✅ Baseline saved for ${mode} mode`, "green"));
+}
+
+export function printResultsPath(resultsDir: string): void {
+  console.log(color(`\nResults saved to: ${resultsDir}`, "dim"));
+}
+
+export function printStatusLine(tool: string, elapsedSeconds: number): void {
+  const mins = Math.floor(elapsedSeconds / 60);
+  const secs = elapsedSeconds % 60;
+  const time = `${mins}:${secs.toString().padStart(2, "0")}`;
+  const toolName = tool === "step_finish" ? "completion" : tool;
+  process.stdout.write(`\r[${color(time, "dim")}] Waiting for ${color(toolName, "cyan")}...`);
+}
+
+export function clearStatusLine(): void {
+  process.stdout.write("\r" + " ".repeat(60) + "\r");
+}
+
+export function printInactivityWarning(seconds: number): void {
+  clearStatusLine();
+  console.log(color(`⚠️ No activity for ${seconds}s - test may be stuck`, "yellow"));
+}
+
+export function printTimeoutKilled(): void {
+  console.log(color("\n❌ Test killed after 10 minute timeout", "red"));
 }

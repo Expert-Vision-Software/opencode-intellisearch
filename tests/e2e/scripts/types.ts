@@ -1,5 +1,12 @@
 export type SkillMode = "explicit" | "implicit";
 
+export interface GitMetadata {
+  commitHash: string;
+  branch: string;
+  version: string;
+  mainCommitHash: string;
+}
+
 export interface TestConfig {
   runs: number;
   mode: SkillMode;
@@ -39,6 +46,7 @@ export interface AggregatedMetrics {
   searchSuccessRate: number;
   solutions: string[];
   runs: RunMetrics[];
+  meta?: GitMetadata;
 }
 
 export interface Thresholds {
@@ -65,6 +73,7 @@ export interface Baseline {
     solutions: string[];
   };
   thresholds: Thresholds;
+  meta?: GitMetadata;
 }
 
 export interface CheckResult {
@@ -80,4 +89,47 @@ export interface TestResult {
   checks: CheckResult[];
   metrics: AggregatedMetrics;
   baseline: Baseline | null;
+}
+
+export interface TokenMetricsReport {
+  generated: string;
+  runCount: number;
+  averages: {
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number;
+  };
+  meta?: GitMetadata;
+  runs: RunMetrics[];
+}
+
+export interface ConsistencyReport {
+  generated: string;
+  runCount: number;
+  consistency: {
+    jaccardScore: number;
+    commonSolutions: string[];
+    allSolutions: string[];
+  };
+  searchSuccessRate: number;
+  tokenMetrics: {
+    average: number;
+    min: number;
+    max: number;
+    stdDev: number;
+  };
+  skillMetrics: {
+    loadedCount: number;
+    explicitCount: number;
+    implicitCount: number;
+    loadRate: number;
+  };
+  workflowCompliance: {
+    averageScore: number;
+    runsUsingGhCli: number;
+    runsUsingDeepWiki: number;
+    runsUsingWebfetch: number;
+  };
+  meta?: GitMetadata;
+  runs: RunMetrics[];
 }
