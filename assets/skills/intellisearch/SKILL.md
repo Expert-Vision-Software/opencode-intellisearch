@@ -1,28 +1,13 @@
 ---
 name: intellisearch
-description: Searches for technical answers by finding GitHub repositories and querying them with DeepWiki. Use when users ask technical questions about frameworks, libraries, APIs, or need documentation from code repositories.
+description: High-precision technical search. Use when the user needs: 1) Real-world code examples from GitHub. 2) Documentation for specific APIs/libraries not found in local files. 3) Comparison of different framework implementations. Mandatory for 'how do I use [X] library' or 'find me a repo that does [Y]' queries.
 license: MIT
 compatibility: opencode
 metadata:
-  version: 0.3.4
+  version: 0.3.5
   audience: agents
-  topic: github-repository-search, frameworks, libraries, packages, code examples
-  triggers:
-  - "library for"
-  - "package for"
-  - "framework that"
-  - "how to use"
-  - "how do I"
-  - "is there a"
-  - "find a"
-  - "looking for"
-  - "need a"
-  - "alternatives to"
-  - "compare"
-  - "vs"
-  - "npm package"
-  - "github repo"
-  - "open source"
+  topic: [github-discovery, api-reference, code-patterns, library-comparison]
+  usage_tips: "Best used after a failed local search. Combines repo-finding with DeepWiki deep-querying."
 ---
 
 ## When To Use
