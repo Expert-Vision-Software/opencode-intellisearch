@@ -29,4 +29,6 @@ Thumbs.db
 .opencode/bun.lock
 .opencode/package.json
 .opencode/docs
-tests/e2e/results/**/run-*
+
+# E2E test results (keep baseline)
+tests/e2e/results/

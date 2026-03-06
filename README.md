@@ -154,9 +154,32 @@ bun install
 # Type check
 bun run check
 
+# Run unit tests
+bun test
+
 # Link for local testing
 bun link
 ```
+
+### E2E Testing
+
+The plugin includes comprehensive E2E tests using the OpenCode SDK:
+
+```bash
+# Quick test (explicit mode, 1 run)
+bun test:e2e
+
+# Multiple runs for metrics
+bun test:e2e --runs 3
+
+# Test both skill loading modes
+bun test:e2e --mode both
+
+# Set baseline after changes
+bun test:e2e --set-baseline
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed testing instructions.
 
 ## 📄 License
 
