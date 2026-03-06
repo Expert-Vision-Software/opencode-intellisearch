@@ -1,5 +1,4 @@
-import { readdir, readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { readdir } from "node:fs/promises";
 
 interface Solution {
   name: string;
@@ -244,11 +243,11 @@ async function compareRuns(resultsDir: string): Promise<ConsistencyReport> {
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
     
-    const runDir = join(resultsDir, entry.name);
-    const outputFile = join(runDir, "output.json");
+    const runDir = `${resultsDir}/${entry.name}`;
+    const outputFile = `${runDir}/output.json`;
     
     try {
-      const content = await readFile(outputFile, "utf-8");
+      const content = await Bun.file(outputFile).text();
       const workflow = analyzeWorkflow(content);
       const { success: searchSuccess, failures } = detectSearchFailures(
         content, 
@@ -354,8 +353,8 @@ async function main(): Promise<void> {
   console.log(`Comparing runs in ${resultsDir}...`);
   const report = await compareRuns(resultsDir);
   
-  const reportPath = join(resultsDir, "consistency-report.json");
-  await writeFile(reportPath, JSON.stringify(report, null, 2));
+  const reportPath = `${resultsDir}/consistency-report.json`;
+  await Bun.write(reportPath, JSON.stringify(report, null, 2));
   
   console.log("\n=== Consistency Report ===");
   console.log(`Runs analyzed: ${report.runCount}`);

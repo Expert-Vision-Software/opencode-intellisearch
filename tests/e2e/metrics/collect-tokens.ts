@@ -1,5 +1,4 @@
-import { readdir, readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { readdir } from "node:fs/promises";
 
 interface TokenMetrics {
   timestamp: string;
@@ -47,11 +46,11 @@ async function collectTokens(resultsDir: string): Promise<TokenMetrics[]> {
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
     
-    const runDir = join(resultsDir, entry.name);
-    const logFile = join(runDir, "output.json");
+    const runDir = `${resultsDir}/${entry.name}`;
+    const logFile = `${runDir}/output.json`;
     
     try {
-      const content = await readFile(logFile, "utf-8");
+      const content = await Bun.file(logFile).text();
       const lines = content.split("\n").filter(Boolean);
       
       let totalInput = 0;
@@ -111,7 +110,7 @@ async function collectTokens(resultsDir: string): Promise<TokenMetrics[]> {
 }
 
 async function writeMetricsReport(resultsDir: string, metrics: TokenMetrics[]): Promise<void> {
-  const reportPath = join(resultsDir, "token-metrics.json");
+  const reportPath = `${resultsDir}/token-metrics.json`;
   
   const avgInput = metrics.reduce((sum, m) => sum + m.inputTokens, 0) / metrics.length || 0;
   const avgOutput = metrics.reduce((sum, m) => sum + m.outputTokens, 0) / metrics.length || 0;
@@ -127,7 +126,7 @@ async function writeMetricsReport(resultsDir: string, metrics: TokenMetrics[]): 
     runs: metrics
   };
   
-  await writeFile(reportPath, JSON.stringify(report, null, 2));
+  await Bun.write(reportPath, JSON.stringify(report, null, 2));
   console.log(`Token metrics written to ${reportPath}`);
 }
 

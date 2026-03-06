@@ -1,16 +1,14 @@
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
-import { mkdir, rm, readdir, readFile, stat } from "node:fs/promises";
-import path from "node:path";
+import { mkdir, rm, readdir, stat } from "node:fs/promises";
 import plugin from "../../plugin.ts";
 
 const EXPECTED_VERSION: string = JSON.parse(
-  await readFile(path.join(import.meta.dirname, "../../package.json"), "utf-8")
+  await Bun.file(`${import.meta.dirname}/../../package.json`).text()
 ).version;
-const TEST_PROJECT_DIR = path.join(import.meta.dirname, "../fixtures/integration-test-project");
+const TEST_PROJECT_DIR = `${import.meta.dirname}/../fixtures/integration-test-project`;
 
 describe("integration", () => {
   beforeAll(async () => {
-    // Clean up and create fresh test project
     try {
       await rm(TEST_PROJECT_DIR, { recursive: true });
     } catch {
@@ -20,7 +18,6 @@ describe("integration", () => {
   });
 
   afterAll(async () => {
-    // Clean up test project
     try {
       await rm(TEST_PROJECT_DIR, { recursive: true });
     } catch {
@@ -36,20 +33,17 @@ describe("integration", () => {
 
       await pluginInstance.config?.({} as any);
 
-      // Verify directory structure
-      const opencodeDir = path.join(TEST_PROJECT_DIR, ".opencode");
+      const opencodeDir = `${TEST_PROJECT_DIR}/.opencode`;
       const entries = await readdir(opencodeDir);
       expect(entries).toContain("skills");
       expect(entries).toContain("commands");
 
-      // Verify skills subdirectory
-      const skillsDir = path.join(opencodeDir, "skills", "intellisearch");
+      const skillsDir = `${opencodeDir}/skills/intellisearch`;
       const skillEntries = await readdir(skillsDir);
       expect(skillEntries).toContain("SKILL.md");
       expect(skillEntries).toContain(".version");
 
-      // Verify commands file
-      const commandsFile = path.join(opencodeDir, "commands", "search-intelligently.md");
+      const commandsFile = `${opencodeDir}/commands/search-intelligently.md`;
       const commandsStats = await stat(commandsFile);
       expect(commandsStats.isFile()).toBe(true);
     });
@@ -61,16 +55,13 @@ describe("integration", () => {
 
       await pluginInstance.config?.({} as any);
 
-      // Verify skill file content
-      const skillFile = path.join(TEST_PROJECT_DIR, ".opencode", "skills", "intellisearch", "SKILL.md");
-      const skillContent = await readFile(skillFile, "utf-8");
+      const skillFile = `${TEST_PROJECT_DIR}/.opencode/skills/intellisearch/SKILL.md`;
+      const skillContent = await Bun.file(skillFile).text();
       
-      // Should have frontmatter
       expect(skillContent).toContain("---");
       expect(skillContent).toContain("name:");
       expect(skillContent).toContain("description:");
       
-      // Should have content
       expect(skillContent.length).toBeGreaterThan(100);
     });
 
@@ -81,16 +72,13 @@ describe("integration", () => {
 
       await pluginInstance.config?.({} as any);
 
-      // Verify command file content
-      const commandFile = path.join(TEST_PROJECT_DIR, ".opencode", "commands", "search-intelligently.md");
-      const commandContent = await readFile(commandFile, "utf-8");
+      const commandFile = `${TEST_PROJECT_DIR}/.opencode/commands/search-intelligently.md`;
+      const commandContent = await Bun.file(commandFile).text();
 
-      // Should have frontmatter
       expect(commandContent).toContain("---");
       expect(commandContent).toContain("description:");
       expect(commandContent).toContain("agent:");
       
-      // Should have command template (simplified wrapper)
       expect(commandContent.length).toBeGreaterThan(100);
     });
   });
@@ -103,34 +91,28 @@ describe("integration", () => {
 
       await pluginInstance.config?.({} as any);
 
-      const versionFile = path.join(TEST_PROJECT_DIR, ".opencode", "skills", "intellisearch", ".version");
-      const version = await readFile(versionFile, "utf-8");
+      const versionFile = `${TEST_PROJECT_DIR}/.opencode/skills/intellisearch/.version`;
+      const version = await Bun.file(versionFile).text();
       
-      // Should match current version
       expect(version.trim()).toBe(EXPECTED_VERSION);
     });
 
     test("should not overwrite files when version matches", async () => {
-      // First install
       const pluginInstance1 = await plugin({
         directory: TEST_PROJECT_DIR,
       } as any);
       await pluginInstance1.config?.({} as any);
 
-      // Get file stats after first install
-      const skillFile = path.join(TEST_PROJECT_DIR, ".opencode", "skills", "intellisearch", "SKILL.md");
+      const skillFile = `${TEST_PROJECT_DIR}/.opencode/skills/intellisearch/SKILL.md`;
       const firstStats = await stat(skillFile);
 
-      // Second install (should skip)
       const pluginInstance2 = await plugin({
         directory: TEST_PROJECT_DIR,
       } as any);
       await pluginInstance2.config?.({} as any);
 
-      // Get file stats after second install
       const secondStats = await stat(skillFile);
 
-      // File should not have been modified (compare timestamps)
       expect(secondStats.mtime.getTime()).toBe(firstStats.mtime.getTime());
     });
   });
@@ -143,13 +125,11 @@ describe("integration", () => {
 
       await pluginInstance.config?.({} as any);
 
-      // Verify paths were created correctly
-      // This implicitly tests path.join works correctly
-      const skillsExist = await stat(path.join(TEST_PROJECT_DIR, ".opencode", "skills", "intellisearch"))
+      const skillsExist = await stat(`${TEST_PROJECT_DIR}/.opencode/skills/intellisearch`)
         .then(() => true)
         .catch(() => false);
       
-      const commandsExist = await stat(path.join(TEST_PROJECT_DIR, ".opencode", "commands", "search-intelligently.md"))
+      const commandsExist = await stat(`${TEST_PROJECT_DIR}/.opencode/commands/search-intelligently.md`)
         .then(() => true)
         .catch(() => false);
 
