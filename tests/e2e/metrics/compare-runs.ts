@@ -6,12 +6,40 @@ interface Solution {
   githubRepo?: string;
 }
 
+interface LogEntry {
+  type?: string;
+  part?: {
+    tool?: string;
+    input?: {
+      name?: string;
+      command?: string;
+      url?: string;
+      prompt?: string;
+    };
+    state?: {
+      input?: {
+        command?: string;
+        prompt?: string;
+      };
+    };
+  };
+}
+
 interface RunResult {
   timestamp: string;
   solutions: Solution[];
   searchSuccess: boolean;
   searchFailures: string[];
   rawOutput: string;
+  skillLoaded: boolean;
+  skillLoadMethod: "explicit" | "implicit" | "none";
+  toolsUsed: string[];
+  workflowCompliance: {
+    usedGhCli: boolean;
+    usedDeepWiki: boolean;
+    usedWebfetch: boolean;
+    score: number;
+  };
 }
 
 interface ConsistencyReport {
@@ -28,6 +56,18 @@ interface ConsistencyReport {
     min: number;
     max: number;
     stdDev: number;
+  };
+  skillMetrics: {
+    loadedCount: number;
+    explicitCount: number;
+    implicitCount: number;
+    loadRate: number;
+  };
+  workflowCompliance: {
+    averageScore: number;
+    runsUsingGhCli: number;
+    runsUsingDeepWiki: number;
+    runsUsingWebfetch: number;
   };
   runs: RunResult[];
 }
@@ -63,8 +103,16 @@ function extractSolutions(text: string): Solution[] {
   return solutions;
 }
 
-function detectSearchFailures(text: string): { success: boolean; failures: string[] } {
+function detectSearchFailures(text: string, skillLoaded: boolean, usedWebfetchOnGithub: boolean): { success: boolean; failures: string[] } {
   const failures: string[] = [];
+  
+  if (!skillLoaded) {
+    failures.push("Skill Not Loaded");
+  }
+  
+  if (usedWebfetchOnGithub) {
+    failures.push("Direct GitHub Fetch (skill not followed)");
+  }
   
   const failurePatterns = [
     { pattern: /captcha|bot detection|blocked/i, name: "Captcha/Block" },
@@ -99,6 +147,96 @@ function calculateStdDev(values: number[]): number {
   return Math.sqrt(squaredDiffs.reduce((a, b) => a + b, 0) / values.length);
 }
 
+function analyzeWorkflow(logContent: string): {
+  skillLoaded: boolean;
+  skillLoadMethod: "explicit" | "implicit" | "none";
+  toolsUsed: string[];
+  workflowCompliance: {
+    usedGhCli: boolean;
+    usedDeepWiki: boolean;
+    usedWebfetch: boolean;
+    usedWebfetchOnGithub: boolean;
+    score: number;
+  };
+} {
+  let skillLoaded = false;
+  let skillLoadMethod: "explicit" | "implicit" | "none" = "none";
+  const toolsUsed = new Set<string>();
+  let usedGhCli = false;
+  let usedDeepWiki = false;
+  let usedWebfetch = false;
+  let usedWebfetchOnGithub = false;
+  
+  const lines = logContent.split("\n").filter(Boolean);
+  
+  for (const line of lines) {
+    try {
+      const parsed: LogEntry = JSON.parse(line);
+      
+      if (parsed.type === "tool_use" && parsed.part?.tool) {
+        const tool = parsed.part.tool;
+        toolsUsed.add(tool);
+        
+        if (tool === "skill" && parsed.part.input?.name === "intellisearch") {
+          skillLoaded = true;
+          skillLoadMethod = "explicit";
+        }
+        
+        if (tool === "task") {
+          const command = parsed.part.input?.command ?? parsed.part.state?.input?.command ?? "";
+          const prompt = parsed.part.input?.prompt ?? parsed.part.state?.input?.prompt ?? "";
+          if (command.startsWith("/search-intelligently") || prompt.startsWith("/search-intelligently")) {
+            skillLoaded = true;
+            skillLoadMethod = "explicit";
+          }
+        }
+        
+        if (tool === "bash" && parsed.part.input?.command) {
+          if (parsed.part.input.command.includes("gh search") || 
+              parsed.part.input.command.includes("gh repo")) {
+            usedGhCli = true;
+          }
+        }
+        
+        if (tool === "DeepWiki_ask_question" || 
+            tool === "DeepWiki_read_wiki_structure" ||
+            tool === "DeepWiki_read_wiki_contents") {
+          usedDeepWiki = true;
+        }
+        
+        if (tool === "webfetch") {
+          usedWebfetch = true;
+          if (parsed.part.input?.url?.includes("github.com")) {
+            usedWebfetchOnGithub = true;
+          }
+        }
+      }
+    } catch {
+      // Skip non-JSON lines
+    }
+  }
+  
+  let score = 0;
+  if (skillLoaded) score += 0.3;
+  if (usedGhCli) score += 0.25;
+  if (usedDeepWiki) score += 0.25;
+  if (!usedWebfetchOnGithub) score += 0.2;
+  score = Math.min(1, score);
+  
+  return {
+    skillLoaded,
+    skillLoadMethod,
+    toolsUsed: [...toolsUsed],
+    workflowCompliance: {
+      usedGhCli,
+      usedDeepWiki,
+      usedWebfetch,
+      usedWebfetchOnGithub,
+      score
+    }
+  };
+}
+
 async function compareRuns(resultsDir: string): Promise<ConsistencyReport> {
   const runs: RunResult[] = [];
   const entries = await readdir(resultsDir, { withFileTypes: true });
@@ -111,14 +249,23 @@ async function compareRuns(resultsDir: string): Promise<ConsistencyReport> {
     
     try {
       const content = await readFile(outputFile, "utf-8");
-      const { success: searchSuccess, failures } = detectSearchFailures(content);
+      const workflow = analyzeWorkflow(content);
+      const { success: searchSuccess, failures } = detectSearchFailures(
+        content, 
+        workflow.skillLoaded, 
+        workflow.workflowCompliance.usedWebfetchOnGithub
+      );
       
       runs.push({
         timestamp: entry.name,
         solutions: extractSolutions(content),
         searchSuccess,
         searchFailures: failures,
-        rawOutput: content
+        rawOutput: content,
+        skillLoaded: workflow.skillLoaded,
+        skillLoadMethod: workflow.skillLoadMethod,
+        toolsUsed: workflow.toolsUsed,
+        workflowCompliance: workflow.workflowCompliance
       });
     } catch (error) {
       console.error(`Failed to read ${outputFile}: ${(error as Error).message}`);
@@ -159,6 +306,15 @@ async function compareRuns(resultsDir: string): Promise<ConsistencyReport> {
   
   const successRate = runs.filter(r => r.searchSuccess).length / runs.length;
   
+  const loadedCount = runs.filter(r => r.skillLoaded).length;
+  const explicitCount = runs.filter(r => r.skillLoadMethod === "explicit").length;
+  const implicitCount = runs.filter(r => r.skillLoadMethod === "implicit").length;
+  
+  const avgWorkflowScore = runs.reduce((sum, r) => sum + r.workflowCompliance.score, 0) / runs.length || 0;
+  const runsUsingGhCli = runs.filter(r => r.workflowCompliance.usedGhCli).length;
+  const runsUsingDeepWiki = runs.filter(r => r.workflowCompliance.usedDeepWiki).length;
+  const runsUsingWebfetch = runs.filter(r => r.workflowCompliance.usedWebfetch).length;
+  
   const report: ConsistencyReport = {
     generated: new Date().toISOString(),
     runCount: runs.length,
@@ -173,6 +329,18 @@ async function compareRuns(resultsDir: string): Promise<ConsistencyReport> {
       min: 0,
       max: 0,
       stdDev: 0
+    },
+    skillMetrics: {
+      loadedCount,
+      explicitCount,
+      implicitCount,
+      loadRate: runs.length > 0 ? loadedCount / runs.length : 0
+    },
+    workflowCompliance: {
+      averageScore: Math.round(avgWorkflowScore * 100) / 100,
+      runsUsingGhCli,
+      runsUsingDeepWiki,
+      runsUsingWebfetch
     },
     runs
   };
@@ -191,6 +359,11 @@ async function main(): Promise<void> {
   
   console.log("\n=== Consistency Report ===");
   console.log(`Runs analyzed: ${report.runCount}`);
+  console.log(`Skill loaded: ${report.skillMetrics.loadedCount}/${report.runCount} (${Math.round(report.skillMetrics.loadRate * 100)}%) - explicit: ${report.skillMetrics.explicitCount}, implicit: ${report.skillMetrics.implicitCount}`);
+  console.log(`Workflow compliance: ${report.workflowCompliance.averageScore} avg score`);
+  console.log(`  - Using gh CLI: ${report.workflowCompliance.runsUsingGhCli} runs`);
+  console.log(`  - Using DeepWiki: ${report.workflowCompliance.runsUsingDeepWiki} runs`);
+  console.log(`  - Using webfetch (bad): ${report.workflowCompliance.runsUsingWebfetch} runs`);
   console.log(`Jaccard similarity: ${report.consistency.jaccardScore}`);
   console.log(`Search success rate: ${report.searchSuccessRate * 100}%`);
   console.log(`Unique solutions found: ${report.consistency.allSolutions.length}`);

@@ -7,6 +7,9 @@ interface TokenMetrics {
   outputTokens: number;
   totalTokens: number;
   logPath: string;
+  skillLoaded: boolean;
+  skillLoadMethod: "explicit" | "implicit" | "none";
+  toolsUsed: string[];
 }
 
 interface LogEntry {
@@ -20,6 +23,18 @@ interface LogEntry {
       cache?: {
         read?: number;
         write?: number;
+      };
+    };
+    tool?: string;
+    input?: {
+      name?: string;
+      command?: string;
+      prompt?: string;
+    };
+    state?: {
+      input?: {
+        command?: string;
+        prompt?: string;
       };
     };
   };
@@ -41,6 +56,9 @@ async function collectTokens(resultsDir: string): Promise<TokenMetrics[]> {
       
       let totalInput = 0;
       let totalOutput = 0;
+      let skillLoaded = false;
+      let skillLoadMethod: "explicit" | "implicit" | "none" = "none";
+      const toolsUsed = new Set<string>();
       
       for (const line of lines) {
         try {
@@ -49,6 +67,25 @@ async function collectTokens(resultsDir: string): Promise<TokenMetrics[]> {
           if (parsed.type === "step_finish" && parsed.part?.tokens) {
             totalInput += parsed.part.tokens.input ?? 0;
             totalOutput += parsed.part.tokens.output ?? 0;
+          }
+          
+          if (parsed.type === "tool_use" && parsed.part?.tool) {
+            const tool = parsed.part.tool;
+            toolsUsed.add(tool);
+            
+            if (tool === "skill" && parsed.part.input?.name === "intellisearch") {
+              skillLoaded = true;
+              skillLoadMethod = "explicit";
+            }
+            
+            if (tool === "task") {
+              const command = parsed.part.input?.command ?? parsed.part.state?.input?.command ?? "";
+              const prompt = parsed.part.input?.prompt ?? parsed.part.state?.input?.prompt ?? "";
+              if (command.startsWith("/search-intelligently") || prompt.startsWith("/search-intelligently")) {
+                skillLoaded = true;
+                skillLoadMethod = "explicit";
+              }
+            }
           }
         } catch {
           // Skip non-JSON lines
@@ -60,7 +97,10 @@ async function collectTokens(resultsDir: string): Promise<TokenMetrics[]> {
         inputTokens: totalInput,
         outputTokens: totalOutput,
         totalTokens: totalInput + totalOutput,
-        logPath: logFile
+        logPath: logFile,
+        skillLoaded,
+        skillLoadMethod,
+        toolsUsed: [...toolsUsed]
       });
     } catch (error) {
       console.error(`Failed to read ${logFile}: ${(error as Error).message}`);
@@ -104,7 +144,9 @@ async function main(): Promise<void> {
   
   console.log(`Found ${metrics.length} runs:`);
   for (const m of metrics) {
-    console.log(`  ${m.timestamp}: ${m.totalTokens} tokens (${m.inputTokens} in, ${m.outputTokens} out)`);
+    const skillStatus = m.skillLoaded ? `skill:${m.skillLoadMethod}` : "no-skill";
+    const toolsCount = m.toolsUsed.length;
+    console.log(`  ${m.timestamp}: ${m.totalTokens} tokens (${m.inputTokens} in, ${m.outputTokens} out) [${skillStatus}] [${toolsCount} tools]`);
   }
   
   await writeMetricsReport(resultsDir, metrics);
