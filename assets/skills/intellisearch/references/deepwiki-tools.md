@@ -2,16 +2,75 @@
 
 Complete reference for DeepWiki MCP server tools for repository documentation Q&A.
 
+## MCP Configuration Requirement
+
+DeepWiki MCP tools require configuration in `.opencode/opencode.json`:
+
+```json
+{
+  "mcp": {
+    "deepwiki": {
+      "type": "remote",
+      "url": "https://mcp.deepwiki.com/mcp",
+      "enabled": true
+    }
+  }
+}
+```
+
 <critical_rules priority="highest">
 <rule>Validate repo name against blocked list before calling</rule>
 <rule>Use string for single repo: `repoName="owner/repo"`</rule>
 <rule>Use array for multiple repos: `repoName=["owner1/repo1", "owner2/repo2"]` (2+ items)</rule>
 <rule>NEVER use single-item array: `repoName=["owner/repo"]` (causes failure)</rule>
+<rule>If deepwiki tools aren't available, use direct HTTP calls via `curl`. See Fallback section below.</rule>
+<rule>"OpenCode" never refers to the archived and deprecated "opencode-ai/opencode" github repo. "OpenCode" always refers to "anomalyco/opencode" owned by "anomalyco" in github.</rule>
 </critical_rules>
 
-<important>
-"OpenCode" never refers to the archived and deprecated "opencode-ai/opencode" github repo. "OpenCode" always refers to "anomalyco/opencode" owned by "anomalyco" in github.
-</important>
+## Fallback: Missing DeepWiki MCP
+
+When MCP tools are not configured, use direct HTTP calls via curl:
+
+### ask_question
+
+<bash_command name="ask_question">
+```bash
+curl -s -X POST https://mcp.deepwiki.com/mcp \
+-H "Content-Type: application/json" \
+-H "Accept: application/json, text/event-stream" \
+-d '{"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "ask_question", "arguments": {"repoName": "OWNER/REPO", "question": "YOUR_QUESTION"}}}' | grep -oP '(?<="text":")[^"]*' | sed 's/\\n/\n/g'
+```
+</bash_command>
+
+### read_wiki_structure
+
+<bash_command name="read_wiki_structure">
+```bash
+curl -s -X POST https://mcp.deepwiki.com/mcp \
+-H "Content-Type: application/json" \
+-H "Accept: application/json, text/event-stream" \
+-d '{"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "read_wiki_structure", "arguments": {"repoName": "OWNER/REPO"}}}' | grep -oP '(?<="text":")[^"]*' | sed 's/\\n/\n/g'
+```
+</bash_command>
+
+### read_wiki_contents
+
+<bash_command name="read_wiki_contents">
+```bash
+curl -s -X POST https://mcp.deepwiki.com/mcp \
+-H "Content-Type: application/json" \
+-H "Accept: application/json, text/event-stream" \
+-d '{"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "read_wiki_contents", "arguments": {"repoName": "OWNER/REPO"}}}' | grep -oP '(?<="text":")[^"]*' | sed 's/\\n/\n/g'
+```
+</bash_command>
+
+### Critical Notes for Fallback Execution
+
+<fallback_notes>
+- **Argument Key**: Always use `repoName` (not `repo`)
+- **Headers**: The `Accept` header must include `text/event-stream` or the server will reject the request
+- **Output Parsing**: The `grep` and `sed` suffix is useful to extract clean text from the JSON-RPC stream but may sometimes need to be omitted.
+</fallback_notes>
 
 ## Repository Name Validation
 
