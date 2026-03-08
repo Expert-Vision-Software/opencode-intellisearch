@@ -34,16 +34,16 @@ gh auth status  # Exit 0 = available
 <search_patterns priority="try_in_order">
 ```bash
 # 1. Full query with topics and language
-gh search repos "{query}" --topic={topics} --language={lang} --json nameWithOwner,stargazersCount,description --limit 10
+gh search repos "{query}" --topic={topics} --language={lang} --json fullName,stargazersCount,createdAt,updatedAt,description --limit 10
 
 # 2. Query with language only
-gh search repos "{query}" --language={lang} --json nameWithOwner,stargazersCount,description --limit 10
+gh search repos "{query}" --language={lang} --json fullName,stargazersCount,createdAt,updatedAt,description --limit 10
 
 # 3. Topic-based search (no query string)
-gh search repos --topic={topics} --language={lang} --json nameWithOwner,stargazersCount,description --limit 10
+gh search repos --topic={topics} --language={lang} --json fullName,stargazersCount,createdAt,updatedAt,description --limit 10
 
 # 4. Broader keyword search
-gh search repos "{query}" --json nameWithOwner,stargazersCount,description --limit 10
+gh search repos "{query}" --json fullName,stargazersCount,createdAt,updatedAt,description --limit 10
 ```
 </search_patterns>
 

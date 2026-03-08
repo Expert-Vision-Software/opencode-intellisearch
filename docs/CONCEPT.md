@@ -57,34 +57,3 @@ Model: MiniMax-M2.5
 Transcript: [baseline-naive-transcript.md](baseline-naive-transcript.md).
 Tokens: 11719
 Model: MiniMax-M2.5
-
-## Comparison Against Intellisearch
-**Version 0.3.0**:
-Transcript: [here](intellisearch-v0_3_0-transcript.md)
-Tokens: 12652
-Model: MiniMax-M2.5
-
-**Version 0.3.2 - phase 1**
-Transcript: [here](phase1-transcript.md)
-Tokens: 8570
-Model: MiniMax-M2.5
-
-**Version 0.3.2 - phase 2**
-Transcript: [here](phase2-transcript.md)
-Tokens: 3753
-Model: MiniMax-M2.5
-
-**Version 0.3.2 - phase 3**
-Transcript: [here](phase3-transcript.md)
-Tokens: 3947
-Model: MiniMax-M2.5
-
-**Version 0.3.2 - phase 4 without search tool**
-Transcript: [here](phase4-nosearchtool-transcript.md)
-Tokens: 6777
-Model: MiniMax-M2.5
-
-**Version 0.3.2 - phase 4 with search tool**
-Transcript: [here](phase4-nosearchtool-transcript.md)
-Tokens: 5965
-Model: MiniMax-M2.5

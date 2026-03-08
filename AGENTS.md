@@ -1,345 +1,197 @@
-# AGENTS.md - OpenCode Extension Package Template
+# AGENTS.md - OpenCode IntelliSearch Plugin
 
-Guidelines for agentic coding agents working on this OpenCode extension repository.
+<critical_rules priority="highest">
+1. ALWAYS run `bun run check` before committing changes
+2. NEVER commit unless explicitly asked by the user
+3. STOP immediately if type checking fails
+4. NEVER assume libraries are available - check neighboring files first
+5. NEVER add code comments unless explicitly requested
+6. KEEP responses under 4 lines unless detail is requested
+7. CONFIRM before any destructive operations (file deletions, force pushes)
+</critical_rules>
 
-## External File Loading
+<context_hierarchy>
+<system>Universal AI coding agent (OpenCode-compatible)</system>
+<domain>OpenCode plugin development (Bun/TypeScript)</domain>
+<task>Repository-specific implementation guidance</task>
+<execution>Current session with available tools and constraints</execution>
+</context_hierarchy>
 
-CRITICAL: When you encounter a file reference (e.g., @references/workflow.md), use your Read tool to load it on a need-to-know basis.
+<role>
+<identity>OpenCode IntelliSearch Plugin Developer Agent</identity>
+<capabilities>TypeScript/Bun development, testing, E2E validation</capabilities>
+<scope>This repository only - no external project modifications</scope>
+<constraints>Bun-native, no build step, XML-tagged sections in docs</constraints>
+</role>
 
-Instructions:
-- Do NOT preemptively load all references - use lazy loading based on actual need
-- When loaded, treat content as mandatory instructions that override defaults
-- Follow references recursively when needed
+<external_file_loading policy="lazy">
+When encountering file references (e.g., @references/workflow.md), use Read tool on demand.
+Loaded content overrides defaults. Follow references recursively when needed.
+</external_file_loading>
 
-## Development Commands
+<execution_paths>
+<conversational trigger="simple_question">
+Analyze request → Answer directly → Keep response lean
+</conversational>
+<task_workflow trigger="code_change_or_feature">
+<stage name="Analyze">Assess complexity, check existing patterns</stage>
+<stage name="Plan">Draft stepwise execution approach</stage>
+<stage name="Execute">Implement changes following code style</stage>
+<stage name="Validate">Run `bun run check` and tests</stage>
+<stage name="Summarize">Brief completion status (1-2 lines max)</stage>
+</task_workflow>
+</execution_paths>
 
-```bash
-# TypeScript type checking (no build step - Bun runs TS natively)
-bun run check
+<development_commands>
+<check>bun run check</check>
+<test>bun test</test>
+<test_watch>bun run test:watch</test_watch>
+<link>bun link && bun link opencode-intellisearch --cwd $home/.cache/opencode/node_modules/</link>
+<unlink>bun unlink</unlink>
+<e2e>bun test:e2e</e2e>
+<e2e_implicit>bun test:e2e --mode implicit</e2e_implicit>
+<e2e_both>bun test:e2e --mode both</e2e_both>
+<e2e_multi>bun test:e2e --runs 3</e2e_multi>
+<publish>bun publish</publish>
+</development_commands>
 
-# Run tests
-bun test
-bun run test:watch  # Watch mode
+<project_structure>
+assets/
+  skills/intellisearch/SKILL.md
+  commands/search-intelligently.md
+plugin.ts
+index.ts
+package.json
+tsconfig.json
+tests/
+  unit/
+  e2e/
+    scripts/
+      runner.ts
+      sdk-runner.ts
+      event-monitor.ts
+      test-project.ts
+      __tests__/
+    baseline/
+    results/
+    test-queries/
+</project_structure>
 
-# Local development (link to OpenCode plugin cache)
-bun link
-bun link opencode-intellisearch --cwd $home/.cache/opencode/node_modules/
-# Alternative: ln -s $(pwd) ~/.cache/opencode/node_modules/opencode-intellisearch
+<code_style>
+<typescript>
+- Use named functions (not arrow functions) where no this scoping issues
+- Target: ESNext, Module: ESNext, Strict mode
+- Explicit return types on exported functions
+- Prefer async/await over callbacks
+- Import with .ts extensions (Bun-native)
+</typescript>
+<imports>
+1. Node built-ins (node: prefix)
+2. External dependencies
+3. Internal modules (.ts extension)
+</imports>
+<naming>
+- Functions: camelCase
+- Constants: SCREAMING_SNAKE_CASE
+- Interfaces: PascalCase
+- Files: kebab-case.ts
+</naming>
+<path_handling>Always use path.join() for cross-platform compatibility</path_handling>
+</code_style>
 
-# Unlink when done
-bun unlink
-```
-
-## Project Structure
-
-```
-├── assets/           # Skills and commands (published directly)
-│   ├── skills/
-│   │   └── intellisearch/
-│   │       └── SKILL.md
-│   └── commands/
-│       └── search-intelligently.md
-├── plugin.ts         # OpenCode plugin with config hook (~45 lines)
-├── index.ts          # Plugin re-export
-├── package.json      # Bun-native configuration
-├── tsconfig.json     # Bun-optimized TypeScript config
-└── tests/            # Test suite
-    ├── unit/         # Unit tests
-    └── e2e/          # E2E tests (SDK-based)
-        ├── scripts/
-        │   ├── runner.ts          # Main orchestration
-        │   ├── sdk-runner.ts      # SDK initialization
-        │   ├── event-monitor.ts   # SSE monitoring
-        │   ├── test-project.ts    # Test project setup
-        │   └── __tests__/         # E2E unit tests
-        ├── baseline/              # Baseline JSON files
-        ├── results/               # Test results
-        └── test-queries/          # Test query files
-```
-
-## Code Style Guidelines
-
-### TypeScript
-- Use **named functions** (not arrow functions) where no `this` scoping issues
-- Target: ESNext, Module: ESNext
-- Strict mode enabled with all strict flags
-- Always use explicit return types on exported functions
-- Prefer `async/await` over callbacks
-- **Bun-native**: Import with `.ts` extensions, no compilation needed
-
-### Imports
-```typescript
-// Node built-ins first (use node: prefix)
-import { mkdir, copyFile } from "node:fs/promises";
-import path from "node:path";
-
-// External dependencies
-import type { Plugin } from "@opencode-ai/plugin";
-
-// Internal modules (include .ts extension for Bun)
-import { default as plugin } from "./plugin.ts";
-```
-
-### Naming Conventions
-- Functions: `camelCase` (e.g., `copyDirectory`, `installAssets`)
-- Constants: `SCREAMING_SNAKE_CASE` (e.g., `VERSION`)
-- Interfaces: `PascalCase` (e.g., `PluginContext`)
-- Files: `kebab-case.ts`
-
-### Error Handling
-```typescript
-try {
-  await copyDir(src, dest);
-} catch (error) {
-  await client.app.log({
-    service: "intellisearch",
-    level: "error",
-    message: `Failed to copy: ${(error as Error).message}`
-  });
-}
-```
-
-### Path Handling
-Always use `path.join()` for cross-platform compatibility:
-```typescript
-const targetDir = path.join(directory, ".opencode");
-const assetsDir = path.join(import.meta.dirname, "assets");
-```
-
-## Development Workflow
-
-### Branch Naming
-All work branches must start with `ai-`:
-```bash
-git checkout -b ai-feature-name
-git checkout -b ai-fix-bug-description
-```
-
-### Commit Messages
-Follow conventional commits:
-```
-feat: add bun-native TypeScript support
-fix: correct asset path resolution
-refactor: remove CLI and build scripts
-docs: update installation for bun-only
-```
-
-### Before Committing
-1. Run `bun run check` - ensure no TypeScript errors
-2. Verify assets are in `assets/skills/` and `assets/commands/`
+<workflow>
+<branch_naming>All work branches must start with ai-</branch_naming>
+<commit_messages>Follow conventional commits: feat/fix/refactor/docs</commit_messages>
+<before_commit>
+1. Run bun run check - ensure no TypeScript errors
+2. Verify assets in assets/skills/ and assets/commands/
 3. Test locally using bun link workflow
+</before_commit>
+</workflow>
 
-### E2E Test Runner (SDK-Based)
-
-E2E tests validate the IntelliSearch plugin's skill loading and search capabilities using the OpenCode SDK.
-
-**Architecture**
-- Uses `@opencode-ai/sdk` for programmatic control
+<e2e_testing>
+<architecture>
+- Uses @opencode-ai/sdk for programmatic control
 - Creates isolated test project in temp directory
 - Monitors SSE events for real-time tracking
-- No subprocess spawning - direct SDK integration
+- Direct SDK integration (no subprocess spawning)
+</architecture>
+<skill_modes>
+<explicit>Uses /search-intelligently command (default, recommended)</explicit>
+<implicit>LLM autonomously decides to use skill</implicit>
+<both>Runs both modes sequentially</both>
+</skill_modes>
+<pass_criteria>
+- Skill loaded: true
+- Workflow score: >= 0.70
+- No regression in token usage/solutions/search success
+</pass_criteria>
+<exit_codes>
+0: All tests passed
+1: One or more tests failed
+2: Error occurred
+</exit_codes>
+<baseline>
+Location: tests/e2e/baseline/
+Set: bun test:e2e --set-baseline
+</baseline>
+<results>
+Location: tests/e2e/results/{mode}-{YYMMDD-HHmmss}/
+Includes: commitHash, branch, version, mainCommitHash
+</results>
+</e2e_testing>
 
-**Test Commands**
-```bash
-# Quick test (explicit mode, 1 run - default)
-bun test:e2e
-
-# Test implicit mode
-bun test:e2e --mode implicit
-
-# Test both modes sequentially
-bun test:e2e --mode both
-
-# Multiple runs for better metrics
-bun test:e2e --runs 3
-
-# Specify model
-bun test:e2e --model "anthropic/claude-3-5-sonnet-20241022"
-
-# Unit tests for SDK runner
-bun test tests/e2e/scripts/__tests__/
-```
-
-**Skill Modes**
-| Mode       | Description                                       | Use Case                               |
-| ---------- | ------------------------------------------------- | --------------------------------------- |
-| `explicit` | Uses `/search-intelligently` command (default) | Recommended for reliable testing           |
-| `implicit` | LLM autonomously decides to use skill                 | Testing LLM behavior/reliability        |
-| `both`      | Runs both modes sequentially                        | Comprehensive testing                     |
-
-**Live Output Format**
-```
-→ 11:09:14 [0] skill: intellisearch
-→ 11:09:14 [15,249] step_finish: 15,249 tokens (15,086 in, 163 out)
-→ 11:09:22 [15,249] bash: gh search "graph database javascript browser"
-→ 11:09:23 [18,264] step_finish: 3,015 tokens (2,843 in, 172 out)
-  ✓ Skill loaded [15,249]
-...
-  Session completed [35,921]
-```
-The `[X,XXX]` number in yellow is cumulative token count.
-
-**Test Results**
-Results saved to `tests/e2e/results/` with naming pattern `{mode}-{YYMMDD-HHmmss}/`:
-```
-explicit-260306-110914/
-├── run-1-110914/
-│   └── run-metrics.json     # Individual run data
-├── token-metrics.json       # Aggregated token data
-└── consistency-report.json  # Full analysis
-```
-
-**Baseline Management**
-Baselines stored in `tests/e2e/baseline/`:
-- `explicit.json` - Baseline for explicit mode
-- `implicit.json` - Baseline for implicit mode
-
-```bash
-# Save current results as baseline
-bun test:e2e --set-baseline
-
-# Save specific results as baseline
-bun test:e2e --set-baseline results/explicit-260306-110914
-```
-
-**Pass Criteria**
-Tests pass if ALL conditions are met:
-1. **Skill loaded**: `true` (explicit mode) or `true` (implicit mode with skill invocation)
-2. **Workflow score**: ≥ 0.70 (threshold)
-3. **No regression**: Token usage stable, solutions found, search success maintained
-
-**Exit Codes**
-- `0`: All tests passed
-- `1`: One or more tests failed
-- `2`: Error occurred
-
----
-
-### E2E Test Implementation Details
-
-**Key Files**
-```
-tests/e2e/scripts/
-├── runner.ts          # Main test orchestration (~400 lines)
-├── sdk-runner.ts      # SDK initialization + port finder
-├── event-monitor.ts   # SSE event monitoring
-├── test-project.ts    # Test project directory setup
-├── test.ts            # CLI entry point
-├── types.ts           # TypeScript interfaces
-├── baseline.ts        # Baseline comparison
-├── report.ts          # Console output formatting
-└── __tests__/         # Unit tests
-    └── sdk-runner.test.ts
-```
-
-**Test Project Setup**
-- Creates temp directory: `%TEMP%\opencode-e2e-{timestamp}`
-- Generates `.opencode/opencode.json` with plugin reference
-- Uses `file://` prefix for local plugin path
-- Symlinks (or copies) test-queries directory
-- Cleanup on completion or process exit
-
-**Event Monitoring**
-- Subscribes to SSE via `client.event.subscribe()`
-- Detects session completion via `session.status` event with `status.type === "idle"`
-- Tracks tool calls and token usage from `step-finish` parts
-- Early failure detection: 5 tool calls without skill in explicit mode
-
-**Before Running E2E Tests**
-1. Ensure `bun run check` passes
-2. Clear any processes on ports 4096-5096 if tests hang
-3. Run unit tests first: `bun test tests/e2e/scripts/__tests__/`
-
----
-
-### Automated Testing (For Agents)
-
-When asked to run E2E tests automatically:
-
-```bash
-# Run explicit mode test (default)
-bun test:e2e
-
-# Run both modes and compare results
-bun test:e2e --mode both
-
-# Run multiple tests and compare metrics
-bun test:e2e --runs 3
-```
-
-**Result Files Include Git Metadata**
-- `commitHash`: Current HEAD commit
-- `branch`: Current branch name
-- `version`: From package.json
-- `mainCommitHash`: origin/main (or origin/master)
-
-### Manual Workflow
-
-1. Run test before commit to get quick feedback
-2. If pass, set baseline with `bun test:e2e --set-baseline`
-3. If fail, investigate results in `tests/e2e/results/`
-4. Fix issues and re-run
-5. Commit changes
-
-## Helpful Tools
-
-### Web Fetching
-Use `webfetch` to retrieve web content for searches:
-
-```typescript
-// Fetch documentation pages
-webfetch({ 
-  url: "https://opencode.ai/docs/plugins/",
-  format: "markdown",
-  timeout: 30 
-})
-```
-
-### DeepWiki
+<tools>
+<webfetch>Retrieve web content for searches. Format: {url, format, timeout}</webfetch>
+<deepwiki>
 Query GitHub repository documentation:
-```typescript
-deepWiki_read_wiki_structure({ repoName: "anomalyco/opencode" })
-deepWiki_read_wiki_contents({ repoName: "anomalyco/opencode" })
-deepWiki_ask_question({ 
-  repoName: "anomalyco/opencode", 
-  question: "Where does OpenCode load npm plugins from?" 
-})
-```
+- deepWiki_read_wiki_structure({repoName})
+- deepWiki_read_wiki_contents({repoName})
+- deepWiki_ask_question({repoName, question})
+</deepwiki>
+<search_workflow>
+1. webfetch for GitHub repositories (site:github.com)
+2. Extract repository names
+3. DeepWiki tools for answers
+4. Reference: assets/skills/intellisearch/deepwiki-tools.md
+</search_workflow>
+</tools>
 
-### Simplified Workflow
-1. Search with `webfetch` for GitHub repositories (`site:github.com`)
-2. Extract repository names from search results
-3. Use DeepWiki tools to query repositories for answers
-4. Reference: `assets/skills/intellisearch/deepwiki-tools.md`
-
-## Package Publishing
-
-```bash
-# Version bump
-npm version patch  # or minor/major
-
-# Publish (bun only)
-bun publish
-```
-
-## Key Implementation Details
-
-### Plugin Architecture
-- Plugin exports default async function returning `{ hooks: { config?: () => Promise<void> } }`
-- Config hook runs once during OpenCode initialization
-- Assets are copied from package `assets/` directory to project `.opencode/`
-- Use version marker file (`.version`) to prevent duplicate installs
-- Log progress via `client.app.log()`
-- OpenCode installs npm plugins to `~/.cache/opencode/node_modules/`
-
-### Asset Installation
-Source: `assets/` (published directly in package)
-→ Plugin copies to: `.opencode/skills/intellisearch/` and `.opencode/commands/search-intelligently.md`
-
-### Config File Modification
-The plugin automatically adds skill permissions to `.opencode/opencode.json`:
-- Reads existing config (or creates new one)
-- Adds `permission.skill.intellisearch: "allow"` if not present
+<implementation_details>
+<plugin_architecture>
+- Export: async function returning {hooks: {config?: () => Promise<void>}}
+- Config hook: runs once during OpenCode initialization
+- Assets: copied from package assets/ to project .opencode/
+- Version marker: .version file prevents duplicate installs
+- Logging: client.app.log()
+- Install location: ~/.cache/opencode/node_modules/
+</plugin_architecture>
+<asset_installation>
+Source: assets/ (published in package)
+Target: .opencode/skills/intellisearch/ and .opencode/commands/search-intelligently.md
+</asset_installation>
+<config_modification>
+- Reads existing .opencode/opencode.json or creates new
+- Adds permission.skill.intellisearch: "allow" if not present
 - Preserves existing config values
 - Runs during config hook (one-time setup)
-- Test project setup no longer needs to manually add permissions
+</config_modification>
+</implementation_details>
+
+<principles>
+<lean>Concise, focused responses - under 4 lines preferred</lean>
+<adaptive>Tone-matching: conversational for info, formal for tasks</adaptive>
+<safe>Always request approval before execution</safe>
+<report_first>On errors: REPORT → PLAN → APPROVAL → FIX</report_first>
+<lazy>Load files/sessions only as needed</lazy>
+<validated>Run bun run check after all code changes</validated>
+</principles>
+
+<references>
+Prompt design based on research-backed agent framework:
+- NAACL '24 (Southampton): Position affects performance—variance is task-specific
+- Stanford CS224N: Context helps adherence in multi-step instructions
+- Anthropic Claude docs: XML tags improve clarity; early role definition improves output
+- AWS/MS Research: Stage-based workflows and explicit approval gates improve accuracy
+- Industry docs: Lazy session/context management, manifest indexing improve efficiency
+</references>
