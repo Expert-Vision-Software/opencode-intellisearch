@@ -5,18 +5,40 @@ All notable changes to the intellisearch extension for OpenCode will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.4.1] - 2025-03-08
+
+### Added
+- Automatic skill permission configuration during plugin install
+- Implicit skill loading detection in E2E tests
+- Cumulative token count display in E2E test output
+- Git metadata (commitHash, branch, version, mainCommitHash) in test results
+- Live feedback during E2E test execution
+- Validation mode for quick E2E testing
+
+### Changed
+- **BREAKING**: AGENTS.md restructured with XML-tagged sections for agent consumption
+- Replaced Node.js file operations with Bun native APIs
+- Updated skill frontmatter for improved discoverability
+- E2E tests now use stdin for query passing
+- Improved E2E test stability to prevent hanging sessions
+
+### Fixed
+- Early failure detection in E2E tests (5 tool calls without skill)
+- Unit test version check failures
+- Plugin loading issues in test environment
+
+## [0.3.0] - 2025-02-15
+
+### Changed
+- Simplified skill to GitHub repository search + DeepWiki workflow
+- Removed site:github.com web search (use GitHub CLI or DeepWiki directly)
+- Updated command to use agent: general with subtask: true
 
 ### Removed
 - Exa integration and API key requirements
 - DuckDuckGo fallback search mechanism
 - Memory caching for follow-up queries
-
-### Changed
-- **BREAKING**: Simplified to GitHub repository search + DeepWiki workflow
-- Updated documentation (README.md, INSTALLATION.md, AGENTS.md)
-- Cleaned up unused reference files
-- Updated command to be simple skill wrapper with agent: general and subtask: true
+- Unused reference files
 
 ## [0.2.0] - 2025-02-03
 
