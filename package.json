@@ -3,6 +3,9 @@
   "version": "0.4.1",
   "type": "module",
   "module": "index.ts",
+  "bin": {
+    "opencode-intellisearch": "./src/cli.ts"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/expert-vision-software/opencode-intellisearch.git"
@@ -17,6 +20,7 @@
   "files": [
     "index.ts",
     "plugin.ts",
+    "src",
     "assets"
   ],
   "scripts": {
@@ -27,6 +31,7 @@
     "test:e2e:baseline": "bun tests/e2e/scripts/test.ts --set-baseline"
   },
   "dependencies": {
+    "@inquirer/prompts": "^8.3.0",
     "@opencode-ai/plugin": "*",
     "@opencode-ai/sdk": "^1.2.20"
   },

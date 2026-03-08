@@ -1,70 +1,54 @@
 import type { Plugin } from "@opencode-ai/plugin";
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { install, getGlobalConfigPath, getPackageVersion, type Scope } from "./src/installer.ts";
 import { join } from "node:path";
-
-const VERSION: string = JSON.parse(
-  await Bun.file(`${import.meta.dirname}/package.json`).text()
-).version;
-
-async function copyDir(src: string, dest: string): Promise<void> {
-  await mkdir(dest, { recursive: true });
-  for (const entry of await readdir(src, { withFileTypes: true })) {
-    const s = `${src}/${entry.name}`;
-    const d = `${dest}/${entry.name}`;
-    entry.isDirectory() ? await copyDir(s, d) : await Bun.write(d, Bun.file(s));
-  }
-}
-
-async function ensureSkillPermission(directory: string): Promise<void> {
-  const configPath = join(directory, ".opencode", "opencode.json");
-  let config: Record<string, unknown>;
-  
-  try {
-    const content = await readFile(configPath, "utf-8");
-    config = JSON.parse(content);
-  } catch {
-    config = {};
-  }
-  
-  if (!config.permission) {
-    config.permission = {};
-  }
-  if (!(config.permission as Record<string, unknown>).skill) {
-    (config.permission as Record<string, unknown>).skill = {};
-  }
-  
-  const skillPerms = (config.permission as Record<string, unknown>).skill as Record<string, unknown>;
-  if (skillPerms.intellisearch !== "allow") {
-    skillPerms.intellisearch = "allow";
-    await mkdir(join(directory, ".opencode"), { recursive: true });
-    await writeFile(configPath, JSON.stringify(config, null, 2));
-  }
-}
 
 const plugin: Plugin = async ({ directory }) => ({
   config: async () => {
-    const targetDir = `${directory}/.opencode`;
-    const marker = `${targetDir}/skills/intellisearch/.version`;
+    const version = await getPackageVersion();
+    const globalConfigPath = getGlobalConfigPath();
+    const globalVersionMarker = join(globalConfigPath, "skills", "intellisearch", ".version");
 
-    try {
-      if ((await Bun.file(marker).text()).trim() === VERSION) return;
-    } catch {
-      // not installed
+    const isGlobalInstall = directory === globalConfigPath || 
+      directory.startsWith(globalConfigPath + "/") ||
+      directory.startsWith(globalConfigPath + "\\");
+
+    let scope: Scope;
+    
+    if (isGlobalInstall) {
+      scope = "global";
+    } else {
+      try {
+        const globalVersion = (await Bun.file(globalVersionMarker).text()).trim();
+        if (globalVersion === version) {
+          return;
+        }
+      } catch {
+        // Global not installed, proceed with local
+      }
+      scope = "local";
     }
 
-    const pkgDir = import.meta.dirname;
-    await copyDir(
-      `${pkgDir}/assets/skills/intellisearch`,
-      `${targetDir}/skills/intellisearch`,
-    );
-    await mkdir(`${targetDir}/commands`, { recursive: true });
-    await Bun.write(
-      `${targetDir}/commands/search-intelligently.md`,
-      Bun.file(`${pkgDir}/assets/commands/search-intelligently.md`),
-    );
+    const marker = scope === "global"
+      ? globalVersionMarker
+      : join(directory, ".opencode", "skills", "intellisearch", ".version");
 
-    await Bun.write(marker, VERSION);
-    await ensureSkillPermission(directory);
+    try {
+      const installedVersion = (await Bun.file(marker).text()).trim();
+      if (installedVersion === version) {
+        return;
+      }
+    } catch {
+      // Not installed, proceed
+    }
+
+    const result = await install(scope, directory);
+    
+    console.log(`\nOpenCode IntelliSearch installed ${scope === "global" ? "globally" : "locally"}:`);
+    console.log(`  Skill: ${result.skillPath}`);
+    console.log(`  Command: ${result.commandPath}`);
+    if (result.migrated) {
+      console.log(`  Migrated: opencode.json → .opencode/opencode.json`);
+    }
   },
 });
 
