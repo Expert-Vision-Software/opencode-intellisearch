@@ -169,6 +169,11 @@ async function runSingleTest(
       monitor.abort();
     }
     if (context) {
+      try {
+        await context.client.session.delete({
+          path: { id: context.sessionId },
+        });
+      } catch {}
       context.server.close();
     }
   }

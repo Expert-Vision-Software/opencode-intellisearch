@@ -60,6 +60,17 @@ export function printToolUse(tool: string, input: Record<string, unknown>, times
       detail = cmd.split("\n")[0]?.slice(0, 40) || "subtask";
       break;
     }
+    case "read": {
+      const filePath = String(input.filePath || "");
+      const shortPath = filePath.split("/").pop() || filePath.slice(0, 50);
+      detail = shortPath;
+      break;
+    }
+    case "google_search": {
+      const query = String(input.query || "");
+      detail = query.slice(0, 50) || "search";
+      break;
+    }
     default:
       detail = "";
   }
