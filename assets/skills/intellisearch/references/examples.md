@@ -8,7 +8,7 @@ Real-world patterns for IntelliSearch skill execution.
 
 <execution>
 <step name="search" tool="gh search repos">
-CMD: `gh search repos "semver validation typescript" --language=typescript --json nameWithOwner,stargazersCount,description --limit 10`
+CMD: `gh search repos "semver validation typescript" --language=typescript --json fullName,stargazersCount,createdAt,updatedAt,description --limit 10`
 RESULT: [npm/node-semver: 4.5K★, mattfarina/semver: 892★, ...]
 </step>
 
@@ -37,9 +37,9 @@ OUTPUT: npm/node-semver recommended (most stars, active maintenance, TypeScript 
 <execution>
 <step name="search" tool="gh search repos (parallel)">
 CMDS:
-- `gh search repos "zustand" --json nameWithOwner,stargazersCount --limit 5`
-- `gh search repos "jotai" --json nameWithOwner,stargazersCount --limit 5`
-- `gh search repos "valtio" --json nameWithOwner,stargazersCount --limit 5`
+- `gh search repos "zustand" --json fullName,stargazersCount,createdAt,updatedAt --limit 5`
+- `gh search repos "jotai" --json fullName,stargazersCount,createdAt,updatedAt --limit 5`
+- `gh search repos "valtio" --json fullName,stargazersCount,createdAt,updatedAt --limit 5`
 RESULT: [pmndrs/zustand: 47K★, pmndrs/jotai: 18K★, pmndrs/valtio: 7K★]
 </step>
 

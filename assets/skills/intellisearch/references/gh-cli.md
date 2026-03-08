@@ -43,21 +43,21 @@ Extract programming language from:
 <example category="topic_language">
 ```bash
 # Query: "semver validation in TypeScript"
-gh search repos --topic=semver,validation --language=typescript --json fullName,stargazersCount --limit 10
+gh search repos --topic=semver,validation --language=typescript --json fullName,stargazersCount,createdAt,updatedAt,description --limit 10
 ```
 </example>
 
 <example category="keyword">
 ```bash
 # Query: "cli shell terminal"
-gh search repos cli shell terminal --json fullName,stargazersCount --limit 10
+gh search repos cli shell terminal --json fullName,stargazersCount,createdAt,updatedAt,description --limit 10
 ```
 </example>
 
 <example category="combined">
 ```bash
 # Topics with additional keywords
-gh search repos "release automation" --topic=semver,versioning --language=typescript --json fullName,stargazersCount --limit 10
+gh search repos "release automation" --topic=semver,versioning --language=typescript --json fullName,stargazersCount,createdAt,updatedAt,description --limit 10
 ```
 </example>
 </examples>
@@ -98,6 +98,36 @@ gh search repos "release automation" --topic=semver,versioning --language=typesc
 | `--limit` | Max results | `--limit=10` |
 | `--json` | Output format | `--json fullName,stargazersCount` |
 | `--archived` | Exclude archived | `--archived=false` |
+
+## JSON Available Fields
+ - createdAt
+ - defaultBranch
+ - description
+ - forksCount
+ - fullName
+ - hasDownloads
+ - hasIssues
+ - hasPages
+ - hasProjects
+ - hasWiki
+ - homepage
+ - id
+ - isArchived
+ - isDisabled
+ - isFork
+ - isPrivate
+ - language
+ - license
+ - name
+ - openIssuesCount
+ - owner
+ - pushedAt
+ - size
+ - stargazersCount
+ - updatedAt
+ - url
+ - visibility
+ - watchersCount
 
 ## Error Handling
 
