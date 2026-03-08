@@ -37,21 +37,26 @@ Source: https://duckduckgo.com/duckduckgo-help-pages/results/syntax
 
 ## Supported File Types
 
+<file_types>
 - `pdf` - PDF documents
 - `doc` / `docx` - Word documents
 - `xls` / `xlsx` - Excel spreadsheets
 - `ppt` / `pptx` - PowerPoint presentations
 - `html` - HTML files
+</file_types>
 
 ## Usage Notes
 
+<important>
 - If no results found with advanced syntax, related results may be shown
 - Bang shortcuts search other sites' search engines (subject to that site's policies)
 - Thousands of bang shortcuts available (see: https://duckduckgo.com/bang)
 - Note: Some advanced syntax may not work correctly on all queries
+</important>
 
 ## Common Patterns for Technical Search
 
+<patterns>
 ```bash
 # Find libraries
 typescript validation library
@@ -71,3 +76,4 @@ semver validation -test intitle:library
 # Package search
 nodejs graph database library
 ```
+</patterns>

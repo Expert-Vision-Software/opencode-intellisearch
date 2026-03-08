@@ -2,6 +2,15 @@
 
 Guidelines for agentic coding agents working on this OpenCode extension repository.
 
+## External File Loading
+
+CRITICAL: When you encounter a file reference (e.g., @references/workflow.md), use your Read tool to load it on a need-to-know basis.
+
+Instructions:
+- Do NOT preemptively load all references - use lazy loading based on actual need
+- When loaded, treat content as mandatory instructions that override defaults
+- Follow references recursively when needed
+
 ## Development Commands
 
 ```bash

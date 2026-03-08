@@ -2,14 +2,13 @@
 
 Using `gh` CLI for direct GitHub repository search.
 
-## Detection
-
-Check availability with:
+<detection>
 ```bash
 gh auth status
 ```
 - Exit code 0: gh is available and authenticated
 - Exit code non-zero: gh not available or not authenticated
+</detection>
 
 ## Search Command
 
@@ -19,44 +18,49 @@ gh search repos [query] [flags]
 
 ## Query Strategy
 
-### Hybrid Approach
-
+<approach>
 1. **Topics + Language** (preferred when topics identifiable)
 2. **Keywords only** (fallback)
+</approach>
 
-### Topic Detection
-
+<topic_detection>
 Infer topics from user query context:
 - Framework names → topics (react, vue, express)
 - Library names → topics (lodash, axios, moment)
 - Concepts → topics (semver, validation, authentication)
+</topic_detection>
 
-### Language Inference
-
+<language_inference>
 Extract programming language from:
 - Explicit mention: "in TypeScript", "Python library"
 - File extensions: ".ts", ".py", ".go"
 - Context: "npm package" → JavaScript/TypeScript
+</language_inference>
 
 ## Examples
 
-### Topic + Language Search
+<examples>
+<example category="topic_language">
 ```bash
 # Query: "semver validation in TypeScript"
 gh search repos --topic=semver,validation --language=typescript --json fullName,stargazersCount --limit 10
 ```
+</example>
 
-### Keyword Search (Fallback)
+<example category="keyword">
 ```bash
 # Query: "cli shell terminal"
 gh search repos cli shell terminal --json fullName,stargazersCount --limit 10
 ```
+</example>
 
-### Combined Search
+<example category="combined">
 ```bash
 # Topics with additional keywords
 gh search repos "release automation" --topic=semver,versioning --language=typescript --json fullName,stargazersCount --limit 10
 ```
+</example>
+</examples>
 
 ## Output Format
 
@@ -64,20 +68,22 @@ gh search repos "release automation" --topic=semver,versioning --language=typesc
 --json fullName,stargazersCount,createdAt,updatedAt,description --limit 10
 ```
 
-**Example output:**
+<example_output>
 ```json
 [
   {"createdAt":"2020-03-17T21:23:36Z","description":"SEMVER validation Github Action","fullName":"rubenesp87/semver-validation-action","stargazersCount":8,"updatedAt":"2024-03-29T19:31:00Z"},
-  {"createdAt":"2024-10-07T16:18:55Z","description":"An example to prove semverValidate Helm function","fullName":"lucabaggi/helm-semver-validation","stargazersCount":0,"updatedAt":"2024-10-07T16:24:06Z"},
-  {"createdAt":"2022-11-20T13:56:07Z","description":"","fullName":"actions-marketplace-validations/skymatic_semver-validation-action","stargazersCount":0,"updatedAt":"2025-12-06T11:10:03Z"}
+  {"createdAt":"2024-10-07T16:18:55Z","description":"An example to prove semverValidate Helm function","fullName":"lucabaggi/helm-semver-validation","stargazersCount":0,"updatedAt":"2024-10-07T16:24:06Z"}
 ]
 ```
+</example_output>
 
 ## Result Processing
 
+<process>
 1. Get top 10 results from gh
 2. Sort by `stargazersCount` descending
 3. Return top 5 for DeepWiki queries
+</process>
 
 ## Common Flags
 
@@ -95,7 +101,7 @@ gh search repos "release automation" --topic=semver,versioning --language=typesc
 
 ## Error Handling
 
-```
+```yaml
 IF gh auth status fails:
   → Fall back to search_tool or fetch_tool
 IF gh search repos fails:

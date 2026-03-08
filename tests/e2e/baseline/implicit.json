@@ -1,8 +1,8 @@
 {
   "version": 1,
-  "generated": "2026-03-06T22:14:10.043Z",
+  "generated": "2026-03-08T07:33:45.504Z",
   "config": {
-    "runs": 2,
+    "runs": 3,
     "model": null,
     "queryFile": "tests/e2e/test-queries/graph-db-search.md"
   },
@@ -10,14 +10,15 @@
     "skillLoaded": true,
     "skillLoadMethod": "implicit",
     "workflowScore": 0.75,
-    "avgTokens": 20990,
-    "solutionsFound": 4,
+    "avgTokens": 24984,
+    "solutionsFound": 5,
     "searchSuccessRate": 1,
     "solutions": [
-      "amark",
       "levelgraph",
-      "quadstorejs",
-      "fortunejs"
+      "amark",
+      "jyotindersingh",
+      "alasql",
+      "graphology"
     ]
   },
   "thresholds": {
@@ -26,7 +27,7 @@
     "minSolutionsFound": 3
   },
   "meta": {
-    "commitHash": "720a2e1ab0f995acd4fb607c94e7383a86ba0425",
+    "commitHash": "53bc7f8045fce5d0d4852696a7169de2259e84c1",
     "branch": "improve-implicit-skill",
     "version": "0.3.5",
     "mainCommitHash": "63dfe5c63ef4c72bc771f23845f6ced3ec638b1d"
