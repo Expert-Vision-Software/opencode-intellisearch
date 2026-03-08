@@ -1,23 +1,24 @@
 {
   "version": 1,
-  "generated": "2026-03-06T16:17:02.061Z",
+  "generated": "2026-03-08T08:07:46.787Z",
   "config": {
-    "runs": 2,
+    "runs": 3,
     "model": null,
     "queryFile": "tests/e2e/test-queries/graph-db-search.md"
   },
   "metrics": {
     "skillLoaded": true,
-    "skillLoadMethod": "explicit",
+    "skillLoadMethod": "implicit",
     "workflowScore": 0.75,
-    "avgTokens": 21681,
-    "solutionsFound": 4,
+    "avgTokens": 27047,
+    "solutionsFound": 5,
     "searchSuccessRate": 1,
     "solutions": [
-      "levelgraph",
       "amark",
+      "levelgraph",
       "graphology",
-      "quadstorejs"
+      "fortunejs",
+      "niclasko"
     ]
   },
   "thresholds": {
@@ -26,9 +27,9 @@
     "minSolutionsFound": 3
   },
   "meta": {
-    "commitHash": "7b6c705b6d29de2566ac71f6b74a657977e6e2f4",
-    "branch": "refactor-testing-protocol",
-    "version": "0.3.4",
-    "mainCommitHash": "9afb170f9231067a57ff8729a0a46da555a74a81"
+    "commitHash": "53bc7f8045fce5d0d4852696a7169de2259e84c1",
+    "branch": "improve-implicit-skill",
+    "version": "0.3.5",
+    "mainCommitHash": "63dfe5c63ef4c72bc771f23845f6ced3ec638b1d"
   }
 }

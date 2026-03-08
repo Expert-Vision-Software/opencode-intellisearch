@@ -2,6 +2,15 @@
 
 Guidelines for agentic coding agents working on this OpenCode extension repository.
 
+## External File Loading
+
+CRITICAL: When you encounter a file reference (e.g., @references/workflow.md), use your Read tool to load it on a need-to-know basis.
+
+Instructions:
+- Do NOT preemptively load all references - use lazy loading based on actual need
+- When loaded, treat content as mandatory instructions that override defaults
+- Follow references recursively when needed
+
 ## Development Commands
 
 ```bash
@@ -326,3 +335,11 @@ bun publish
 ### Asset Installation
 Source: `assets/` (published directly in package)
 → Plugin copies to: `.opencode/skills/intellisearch/` and `.opencode/commands/search-intelligently.md`
+
+### Config File Modification
+The plugin automatically adds skill permissions to `.opencode/opencode.json`:
+- Reads existing config (or creates new one)
+- Adds `permission.skill.intellisearch: "allow"` if not present
+- Preserves existing config values
+- Runs during config hook (one-time setup)
+- Test project setup no longer needs to manually add permissions

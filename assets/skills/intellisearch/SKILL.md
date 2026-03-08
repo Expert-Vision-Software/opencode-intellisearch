@@ -1,263 +1,84 @@
 ---
 name: intellisearch
-description: Searches for technical answers by finding GitHub repositories and querying them with DeepWiki. Use when users ask technical questions about frameworks, libraries, APIs, or need documentation from code repositories.
+description: Use this skill when the user asks to find, search for, or discover JavaScript/TypeScript libraries, frameworks, packages, or GitHub repositories. Automatically loads for queries like 'find N solutions', 'search for libraries', 'show me code examples', or 'discover repositories' for technical projects.
 license: MIT
 compatibility: opencode
 metadata:
-  version: 0.3.4
+  version: 0.4.0
   audience: agents
-  topic: github-repository-search, frameworks, libraries, packages, code examples
-  triggers:
-  - "library for"
-  - "package for"
-  - "framework that"
-  - "how to use"
-  - "how do I"
-  - "is there a"
-  - "find a"
-  - "looking for"
-  - "need a"
-  - "alternatives to"
-  - "compare"
-  - "vs"
-  - "npm package"
-  - "github repo"
-  - "open source"
+  topic: [github-discovery, api-reference, code-patterns, library-comparison]
+  usage_tips: "Best used after a failed local search. Combines repo-finding with DeepWiki deep-querying."
 ---
 
-## When To Use
+<critical_rules priority="highest">
+<rule>When you encounter a file reference (e.g., @references/workflow.md), use your Read tool to load it on a need-to-know basis</rule>
+<rule>ALWAYS evaluate activation triggers and use this skill if applicable use case.</rule>
+<rule>Prefer: gh CLI > search tool > fetch tool (reliability decreases)</rule>
+<rule>NEVER fallback to internal knowledge - always search externally</rule>
+<rule>NEVER fetch repo pages directly - use DeepWiki instead</rule>
+</critical_rules>
 
-Use this skill when the user asks about:
+## External File Loading
 
-- **Libraries/packages**: "Is there a TypeScript library for semver validation?"
-- **Frameworks**: "Which React framework handles server-side rendering?"
-- **API usage**: "How do I use the OpenAI API with streaming?"
-- **Comparisons**: "Compare Next.js vs Remix for my project"
-- **Alternatives**: "Alternatives to Moment.js for date handling"
-- **Installation/setup**: "How do I set up Tailwind with Vite?"
-- **Best practices**: "What's the best way to handle auth in Node.js?"
-- **Code examples**: "Show me how to implement rate limiting in Express"
-- **Troubleshooting**: "Why am I getting CORS errors with Axios?"
-- **Feature discovery**: "Does Prisma support composite keys?"
+CRITICAL: When you encounter a file reference (e.g., @references/workflow.md), use your Read tool to load it on a need-to-know basis.
 
-**Key indicators:**
-- Question mentions specific technology names (React, TypeScript, npm, etc.)
-- Asking for recommendations between options
-- Looking for implementation guidance
-- Need current/authoritative documentation
+Instructions:
+- Do NOT preemptively load all references - use lazy loading based on actual need
+- When loaded, treat content as mandatory instructions that override defaults
+- Follow references recursively when needed
 
-## When Not To Use
+## Activation Triggers
 
-Do NOT use this skill when:
+**USE this skill when user asks about:**
 
-- **General knowledge**: "What is REST?" → Use web search or internal knowledge
-- **Non-technical topics**: "What's the weather?" → Irrelevant
-- **User's own code**: "Debug my script" → Use code analysis tools directly
-- **Specific repository known**: "Tell me about facebook/react" → Use DeepWiki directly
-- **No GitHub relevance**: "How do I cook pasta?" → Irrelevant
-- **Current events/news**: "What happened to NPM yesterday?" → Use web search
-- **Private/internal repos**: "Search my company's private repo" → DeepWiki can't access
-- **Pure syntax questions**: "What's the syntax for arrow functions?" → Use internal knowledge
-- **Opinion questions**: "Is React better than Vue?" → No factual repo answer
+<use_cases>
+<case category="libraries">"Is there a TypeScript library for semver validation?"</case>
+<case category="frameworks">"Which React framework handles server-side rendering?"</case>
+<case category="comparisons">"Compare Next.js vs Remix for my project"</case>
+<case category="alternatives">"Alternatives to Moment.js for date handling"</case>
+<case category="setup">"How do I set up Tailwind with Vite?"</case>
+<case category="practices">"What's the best way to handle auth in Node.js?"</case>
+<case category="examples">"Show me how to implement rate limiting in Express"</case>
+<case category="troubleshooting">"Why am I getting CORS errors with Axios?"</case>
+<case category="features">"Does Prisma support composite keys?"</case>
+</use_cases>
 
-**Use alternatives instead:**
-- General concepts → Internal knowledge or web search
-- User's local code → Read/analyze files directly
-- Known specific repo → Call DeepWiki directly without search
+**Key indicators:** Technology names mentioned (React, TypeScript, npm), asking for recommendations, implementation guidance, need current/authoritative documentation.
 
-## Definitions
+**DO NOT USE for:**
 
-| Term | Definition | Example |
-|------|------------|---------|
-| **Fetch Tool** | Reads URL, returns content | `webfetch` |
-| **Search Tool** | Takes query, searches web | `websearch`, `google_search` |
-| **URI-Based Search** | Fetch tool + search engine URL | `webfetch("https://google.com/search?q=...")` |
-| **GitHub CLI** | Direct GitHub API access | `gh search repos` |
+<non_use_cases>
+<case>General knowledge ("What is REST?") → Use web search or internal knowledge</case>
+<case>Non-technical topics ("What's the weather?") → Irrelevant</case>
+<case>User's own code ("Debug my script") → Use code analysis tools directly</case>
+<case>Known specific repo ("Tell me about facebook/react") → Use DeepWiki directly</case>
+<case>No GitHub relevance ("How do I cook pasta?") → Irrelevant</case>
+<case>Current events/news ("What happened to NPM yesterday?") → Use web search</case>
+<case>Private/internal repos ("Search my company's private repo") → DeepWiki can't access</case>
+<case>Pure syntax questions ("What's the syntax for arrow functions?") → Use internal knowledge</case>
+<case>Opinion questions ("Is React better than Vue?") → No factual repo answer</case>
+</non_use_cases>
 
-## Critical Rules
+## Workflow Summary
 
-1. **NEVER fallback to internal knowledge** - always search externally
-2. **NEVER fetch repository README/pages directly** - use DeepWiki instead
-3. **NEVER use `site:github.com` with search/fetch tools** - causes bad URL extraction
-4. **Prefer gh CLI > search tool > fetch tool** - reliability decreases down the chain
-5. **If DeepWiki multi-repo fails, query repos individually**
-6. **Limit tool calls to 5 per query** - each call adds context tokens
-7. **Filter to top 3 repos before DeepWiki** - avoid over-exploration
-
-## Workflow
-
-```
-[Detect tools: gh → search → fetch]
-              ↓
-1. Search repositories
-   - gh CLI: Use "gh search repos" (direct API)
-   - No gh: Use EXTERNAL search engines (Brave/DDG/Google)
-              ↓
-2. Extract owner/repo format (from gh JSON or search snippets)
-              ↓
-2.5. Filter to top 3 by stars
-              ↓
-3. Query DeepWiki (max 3 repos)
-              ↓
-4. Return answer from DeepWiki results
-```
-
-## Step 1: Search Repositories
-
-**Priority:** `gh CLI` → `search tool` → `fetch tool`
-
-### Method 1: gh CLI (Preferred - Direct API, No HTML Parsing)
-
-**Try these searches in order (stop when you get good results):**
-
-```bash
-# 1. Full query with topics and language
-gh search repos "semver validation" --topic=semver,validation --language=typescript --json fullName,stargazersCount,createdAt,updatedAt,description --limit 10
-
-# 2. Query with language only
-gh search repos "semver validation" --language=typescript --json fullName,stargazersCount,createdAt,updatedAt,description --limit 10
-
-# 3. Topic-based search (no query string)
-gh search repos --topic=semver,validation --language=typescript --json fullName,stargazersCount,createdAt,updatedAt,description --limit 10
-
-# 4. Broader keyword search
-gh search repos "semver validation" --json fullName,stargazersCount,createdAt,updatedAt,description --limit 10
-```
-
-**From results:**
-- Sort by `stargazersCount` (descending), then by `updatedAt` (descending)
-- Take top 5 candidates
-- **Skip to Step 3** (DeepWiki query)
-
-### Method 2: Search Tool (Fallback - No site: Operator)
-
-**DO NOT use `site:github.com`** - it returns full GitHub URLs that get misparsed.
-
-**Instead, search for the technology + keywords:**
-
-```json
-{ "query": "typescript semver validation library npm package" }
-```
-
-**Look for:**
-- Package names mentioned (e.g., "semver", "semver-compare")
-- Library names in snippets
-- GitHub repo references in descriptions (e.g., "github.com/user/repo")
-
-**Extract repo names from search snippets:**
-- Look for `github.com/owner/repo` patterns in result descriptions
-- Validate: owner and repo contain only alphanumeric, `-`, `_`, `.`
-
-### Method 3: Fetch Tool (Fallback - EXTERNAL Search Engines Only)
-
-**CRITICAL: Only fetch EXTERNAL search engines, NEVER github.com.**
-
-**Allowed URLs (external search engines only):**
-
-| Priority | Engine | URL Pattern |
-|----------|--------|-------------|
-| 1 | Brave | `https://search.brave.com/search?q={encoded_query}` |
-| 2 | DuckDuckGo | `https://duckduckgo.com/?q={encoded_query}` |
-| 3 | Google | `https://www.google.com/search?q={encoded_query}` |
-
-**Example:**
-```json
-{
-  "url": "https://search.brave.com/search?q=typescript%20semver%20validation%20library",
-  "format": "markdown",
-  "timeout": 10
-}
-```
-
-**From results:**
-- Extract repo names from search snippets (not from navigation/ads)
-- Look for `github.com/owner/repo` in result descriptions
-- Validate owner is NOT in blocked list
-
-## Step 2: Extract Repositories (skip if gh CLI used)
-
-**Only needed for search tool / fetch tool results.**
-
-### Valid Repository URL Patterns
-
-| Pattern | Regex | Example |
-|---------|-------|---------|
-| Standard repo | `github\.com/([\w-]+)/([\w.-]+)` | `github.com/npm/node-semver` |
-| GitHub Pages | `([\w-]+)\.github\.io/([\w.-]+)` | `npm.github.io/semver` |
-
-### Validation Rules
-
-**See [deepwiki-tools.md](references/deepwiki-tools.md) for blocked path list.**
-
-**Only extract if:**
-- First segment (owner) is NOT in blocked list
-- Owner contains only: alphanumeric, `-`, `_`
-- Repo contains only: alphanumeric, `-`, `_`, `.`
-
-## Step 2.5: Filter Candidates
-
-Select **top 3 repositories** before DeepWiki query.
-
-**Prioritization:**
-1. **Stars** - Higher count = community validation
-2. **Recency** - Recent commits = active maintenance
-3. **Language match** - Prefer repos matching query language
-
-**Do not query DeepWiki for repos you won't recommend.**
-
-## Step 3: Query DeepWiki
-
-**Multi-repo query (try first):**
-```json
-{
-  "repoName": ["npm/node-semver", "mattfarina/semver-isvalid"],
-  "question": "Is there a TypeScript-compatible package for validating semver strings?"
-}
-```
-
-**IF multi-repo fails (any repo unindexed):**
-```json
-// Query repos individually
-{ "repoName": "npm/node-semver", "question": "..." }
-{ "repoName": "mattfarina/semver-isvalid", "question": "..." }
-```
-
-**Format rules:**
-- Single: `repoName="owner/repo"` (string)
-- Multi: `repoName=["owner1/repo1", "owner2/repo2"]` (array, 2+ items)
-- ❌ Never: `repoName=["owner/repo"]` (single-item array fails)
-
-**Efficiency rules:**
-- Query max 3 repos per request
-- Prioritize by: stars > recency > language match
-- If multi-repo fails, query top candidate only (not all individually)
-
-## Step 4: Return Answer
-
-From DeepWiki results, provide:
-- Best options with trade-offs
-- Specific implementation guidance
-- Code examples if available
-- Repository links
-
-> **Efficiency:** If you found more than 3 repos, prioritize by: stars > recency > language match. Only include details for your top 3 candidates.
-
-## Failure Handling
-
-| Failure | Action |
-|---------|--------|
-| gh CLI not available | Fall back to search tool |
-| Search tool not available | Fall back to fetch tool + URI cycling |
-| URI search fails (captcha/redirect) | Try next engine in cycle |
-| All URI searches fail | Report: "Unable to search - no working search method" |
-| DeepWiki multi-repo fails | Query repos individually |
-| DeepWiki single repo fails | Try next repo in list |
-| All DeepWiki queries fail | Report: "Repos found but not indexed by DeepWiki" |
+<workflow>
+<phase name="detect">Check available tools: gh CLI → search tool → fetch tool</phase>
+<phase name="search">Execute search using highest priority available tool</phase>
+<phase name="filter">Select top 3 repos by stars, recency, language match</phase>
+<phase name="query">Query DeepWiki with repos (multi-repo first, fallback to individual)</phase>
+<phase name="synthesize">Return answer with trade-offs, implementation guidance, links</phase>
+</workflow>
 
 ## References
 
-- [search-workflow.md](references/search-workflow.md) - Tool detection, URI cycling
-- [gh-cli.md](references/gh-cli.md) - GitHub CLI search syntax
-- [google-search.md](references/google-search.md) - Google operators
-- [brave-search.md](references/brave-search.md) - Brave operators
-- [ddg-search.md](references/ddg-search.md) - DuckDuckGo operators
+**Read immediately:**
+- @references/examples.md - Few-shot examples (library discovery, comparison, fallback)
+- @references/workflow.md - Pipeline phases, decision matrix, failure handling
+- @references/search-workflow.md - Tool detection, URI cycling
+
+**Load on-demand:**
+- @references/gh-cli.md - GitHub CLI search syntax
+- @references/deepwiki-tools.md - DeepWiki usage, blocked paths, validation
+- @references/google-search.md - Google operators
+- @references/brave-search.md - Brave operators
+- @references/ddg-search.md - DuckDuckGo operators

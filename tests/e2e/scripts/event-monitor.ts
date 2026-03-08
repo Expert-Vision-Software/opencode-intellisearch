@@ -5,6 +5,7 @@ import { printToolUse, printStepFinish, clearStatusLine } from "./report.ts";
 export interface EventMonitor {
   toolCallCount: number;
   skillDetected: boolean;
+  skillLoadMethod: "explicit" | "implicit" | "none";
   tokens: { input: number; output: number };
   toolsUsed: Set<string>;
   abort: () => void;
@@ -60,6 +61,7 @@ export async function createEventMonitor(
   const state: EventMonitor = {
     toolCallCount: 0,
     skillDetected: false,
+    skillLoadMethod: "none",
     tokens: { input: 0, output: 0 },
     toolsUsed: new Set(),
     abort: () => abortController.abort(),
@@ -111,10 +113,13 @@ export async function createEventMonitor(
               const command = input.command as string | undefined;
               const prompt = input.prompt as string | undefined;
               
-              if (name === "intellisearch" || 
-                  command?.startsWith("/search-intelligently") ||
-                  prompt?.startsWith("/search-intelligently")) {
+              const isExplicitCommand = command?.startsWith("/search-intelligently") ||
+                                        prompt?.startsWith("/search-intelligently");
+              const isImplicitSkill = name === "intellisearch";
+              
+              if (isExplicitCommand || isImplicitSkill) {
                 state.skillDetected = true;
+                state.skillLoadMethod = isExplicitCommand ? "explicit" : "implicit";
                 const cumulativeTokens = state.tokens.input + state.tokens.output;
                 console.log(`  ✓ Skill loaded [${cumulativeTokens.toLocaleString()}]`);
               }

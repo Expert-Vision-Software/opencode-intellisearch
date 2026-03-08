@@ -38,13 +38,16 @@ Source: https://search.brave.com/help/operators
 
 ## Usage Notes
 
+<important>
 - Search operators are experimental and in early development
 - Can place operators anywhere in query
 - Language codes: ISO 639-1 (en, es, fr, etc.)
 - Country codes: ISO 3166-1 alpha-2 (us, ca, gb, etc.)
+</important>
 
 ## Common Patterns for Technical Search
 
+<patterns>
 ```bash
 # Find documentation files
 "user guide" filetype:pdf
@@ -61,3 +64,4 @@ graph database library -mongodb
 # Package search
 npm package semver validation
 ```
+</patterns>

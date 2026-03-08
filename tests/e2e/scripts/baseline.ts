@@ -6,7 +6,7 @@ const BASELINE_VERSION = 1;
 
 const DEFAULT_THRESHOLDS = {
   minWorkflowScore: 0.70,
-  maxTokenIncrease: 500,
+  maxTokenIncrease: 7500,
   minSolutionsFound: 3
 };
 

@@ -1,5 +1,6 @@
 import type { Plugin } from "@opencode-ai/plugin";
-import { mkdir, readdir } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 
 const VERSION: string = JSON.parse(
   await Bun.file(`${import.meta.dirname}/package.json`).text()
@@ -14,8 +15,34 @@ async function copyDir(src: string, dest: string): Promise<void> {
   }
 }
 
+async function ensureSkillPermission(directory: string): Promise<void> {
+  const configPath = join(directory, ".opencode", "opencode.json");
+  let config: Record<string, unknown>;
+  
+  try {
+    const content = await readFile(configPath, "utf-8");
+    config = JSON.parse(content);
+  } catch {
+    config = {};
+  }
+  
+  if (!config.permission) {
+    config.permission = {};
+  }
+  if (!(config.permission as Record<string, unknown>).skill) {
+    (config.permission as Record<string, unknown>).skill = {};
+  }
+  
+  const skillPerms = (config.permission as Record<string, unknown>).skill as Record<string, unknown>;
+  if (skillPerms.intellisearch !== "allow") {
+    skillPerms.intellisearch = "allow";
+    await mkdir(join(directory, ".opencode"), { recursive: true });
+    await writeFile(configPath, JSON.stringify(config, null, 2));
+  }
+}
+
 const plugin: Plugin = async ({ directory }) => ({
-  config: async (config) => {
+  config: async () => {
     const targetDir = `${directory}/.opencode`;
     const marker = `${targetDir}/skills/intellisearch/.version`;
 
@@ -37,6 +64,7 @@ const plugin: Plugin = async ({ directory }) => ({
     );
 
     await Bun.write(marker, VERSION);
+    await ensureSkillPermission(directory);
   },
 });
 

@@ -2,31 +2,36 @@
 
 Tool detection and search strategy for finding GitHub repositories.
 
+<critical_rules priority="highest">
+<rule>NEVER use `site:github.com` with search tools - returns full URLs that get misparsed</rule>
+<rule>Only fetch EXTERNAL search engines, NEVER github.com URLs</rule>
+<rule>Cycle through engines on failure: Brave → DuckDuckGo → Google</rule>
+</critical_rules>
+
 ## Tool Priority
 
-Before searching, detect available tools:
-
-```
-IF gh auth status succeeds:
-  → Use gh search repos (PREFERRED - direct API)
-ELSE IF search_tool exists:
-  → Use search tool with keywords (NOT site:github.com)
-ELSE IF fetch_tool exists:
-  → Use URI-based search with engine cycling
-ELSE:
-  → Report: "No search capability available"
-  → fallback to internal knowledge
+```yaml
+detection:
+  IF gh auth status succeeds:
+    → Use gh search repos (PREFERRED - direct API)
+  ELSE IF search_tool exists:
+    → Use search tool with keywords (NOT site:github.com)
+  ELSE IF fetch_tool exists:
+    → Use URI-based search with engine cycling
+  ELSE:
+    → Report: "No search capability available"
+    → fallback to internal knowledge
 ```
 
 ## GitHub CLI (Preferred)
 
-**Detection:**
+<detection>
 ```bash
 gh auth status  # Exit 0 = available
 ```
+</detection>
 
-**Search Patterns (try in order):**
-
+<search_patterns priority="try_in_order">
 ```bash
 # 1. Full query with topics and language
 gh search repos "{query}" --topic={topics} --language={lang} --json nameWithOwner,stargazersCount,description --limit 10
@@ -40,34 +45,38 @@ gh search repos --topic={topics} --language={lang} --json nameWithOwner,stargaze
 # 4. Broader keyword search
 gh search repos "{query}" --json nameWithOwner,stargazersCount,description --limit 10
 ```
+</search_patterns>
 
-**Process:**
+<process>
 1. Infer topics from query (framework/library names → topics)
 2. Infer language if mentioned
 3. Sort by stargazersCount, return top 5
 4. Skip to DeepWiki query
+</process>
 
-**Reference:** [gh-cli.md](gh-cli.md)
+See @gh-cli.md for detailed syntax.
 
 ## Search Tool (Fallback #1)
 
-**DO NOT use `site:github.com`** - it returns full GitHub URLs that get misparsed as repos.
+<constraint>DO NOT use `site:github.com` - it returns full GitHub URLs that get misparsed as repos.</constraint>
 
-**Instead, search for technology + keywords:**
-
+<query_format>
 ```json
 { "query": "{technology} {feature} {language} library package" }
 ```
+</query_format>
 
-**Example:**
+<example>
 ```json
 { "query": "typescript semver validation library npm package" }
 ```
+</example>
 
-**From results:**
+<result_processing>
 - Look for package names in snippets
 - Find `github.com/owner/repo` references in descriptions
 - Ignore navigation/ads
+</result_processing>
 
 ## URI-Based Search (Fallback #2)
 
@@ -79,8 +88,8 @@ When only fetch tools available, cycle through engines:
 | 2 | DuckDuckGo | `https://duckduckgo.com/?q={terms}` |
 | 3 | Google | `https://www.google.com/search?q={terms}` |
 
-**Error Handling:**
-```
+<error_handling>
+```yaml
 FOR each engine IN [brave, duckduckgo, google]:
   result = fetch(engine_url)
   IF success AND has_search_results:
@@ -88,13 +97,15 @@ FOR each engine IN [brave, duckduckgo, google]:
   CONTINUE
 RETURN error: all engines failed
 ```
+</error_handling>
 
-**Failure Causes:**
+<failure_causes>
 - JavaScript redirects (Google)
 - Captchas (DuckDuckGo)
 - HTML parsing issues
+</failure_causes>
 
-**Example:**
+<example>
 ```json
 {
   "url": "https://search.brave.com/search?q=typescript%20semver%20validation%20library",
@@ -102,27 +113,31 @@ RETURN error: all engines failed
   "timeout": 10
 }
 ```
+</example>
 
 ## Query Construction
 
-**Keyword-based (preferred):**
+<keyword_based>
 ```
 {technology} {feature} {language} library package
 ```
+</keyword_based>
 
-**Examples:**
+<examples>
 - `react hooks typescript library`
 - `semver validation nodejs package`
 - `graph database python library`
+</examples>
 
-**From results, extract repos by:**
-- Looking for `github.com/owner/repo` in snippet descriptions
-- Finding package names that map to known repos
-- Following links in documentation references
+<result_extraction>
+- Look for `github.com/owner/repo` in snippet descriptions
+- Find package names that map to known repos
+- Follow links in documentation references
+</result_extraction>
 
 ## References
 
-- [gh-cli.md](gh-cli.md)
-- [google-search.md](google-search.md)
-- [brave-search.md](brave-search.md)
-- [ddg-search.md](ddg-search.md)
+- @gh-cli.md - GitHub CLI syntax
+- @google-search.md - Google operators
+- @brave-search.md - Brave operators
+- @ddg-search.md - DuckDuckGo operators

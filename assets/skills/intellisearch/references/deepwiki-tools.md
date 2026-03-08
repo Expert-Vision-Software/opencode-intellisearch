@@ -1,6 +1,13 @@
-# deepWiki Tools Reference
+# DeepWiki Tools Reference
 
-Complete reference for deepWiki MCP server tools for repository documentation Q&A.
+Complete reference for DeepWiki MCP server tools for repository documentation Q&A.
+
+<critical_rules priority="highest">
+<rule>Validate repo name against blocked list before calling</rule>
+<rule>Use string for single repo: `repoName="owner/repo"`</rule>
+<rule>Use array for multiple repos: `repoName=["owner1/repo1", "owner2/repo2"]` (2+ items)</rule>
+<rule>NEVER use single-item array: `repoName=["owner/repo"]` (causes failure)</rule>
+</critical_rules>
 
 <important>
 "OpenCode" never refers to the archived and deprecated "opencode-ai/opencode" github repo. "OpenCode" always refers to "anomalyco/opencode" owned by "anomalyco" in github.
@@ -12,7 +19,8 @@ Before calling DeepWiki, validate that the repository name is legitimate and not
 
 ### Blocked First Segments
 
-**Reject any `owner/repo` where the owner (first segment) matches these:**
+<blocked_owners>
+Reject any `owner/repo` where the owner (first segment) matches these:
 
 ```
 about, accelerator, apps, archiveprogram, blog, careers, changelog,
@@ -24,6 +32,7 @@ resources, security, securitylab, sessions, settings, site-policy,
 skills, solutions, sponsors, support, team, topics, trending,
 trust-center, whitepapers, why-github
 ```
+</blocked_owners>
 
 ### Validation Rules
 
@@ -51,53 +60,54 @@ trust-center, whitepapers, why-github
 ## Available Tools
 
 ### deepWiki_read_wiki_structure
-Get available documentation topics for a repository.
 
-**Parameters:**
+<tool name="deepWiki_read_wiki_structure">
+<params>
 - `repoName` (required): Repository in `owner/repo` format
-
-**Returns:** List of available documentation sections and topics.
-
-**Use when:** Exploring what documentation is available before asking specific questions.
+</params>
+<returns>List of available documentation sections and topics</returns>
+<use_when>Exploring what documentation is available before asking specific questions</use_when>
+</tool>
 
 ### deepWiki_read_wiki_contents
-Read full documentation content for a repository.
 
-**Parameters:**
+<tool name="deepWiki_read_wiki_contents">
+<params>
 - `repoName` (required): Repository in `owner/repo` format
-
-**Returns:** Complete documentation content.
-
-**Use when:** You need comprehensive documentation overview or when `ask_question` doesn't provide enough detail.
+</params>
+<returns>Complete documentation content</returns>
+<use_when>You need comprehensive documentation overview or when `ask_question` doesn't provide enough detail</use_when>
+</tool>
 
 ### deepWiki_ask_question
-Ask specific questions about a repository.
 
-**Parameters:**
+<tool name="deepWiki_ask_question">
+<params>
 - `repoName` (required): Repository in `owner/repo` format
   - **Single repo**: Use string: `"owner/repo"`
   - **Multiple repos**: Use array: `["owner1/repo1", "owner2/repo2"]`
   - **Critical**: Do not pass single-item array like `["owner/repo"]` for one repo
 - `question` (required): Specific question about the repository
+</params>
+<returns>Targeted answer based on repository documentation</returns>
+<use_when>You have a specific question and want a direct answer</use_when>
+</tool>
 
-**Returns:** Targeted answer based on repository documentation.
-
-**Use when:** You have a specific question and want a direct answer.
-
-**Important format rules:**
+<format_rules>
 - Single repository: `repoName="anomalyco/opencode"`
 - Multiple repositories: `repoName=["anomalyco/opencode", "vercel/next.js"]`
 - ❌ Wrong: `repoName=["anomalyco/opencode"]` (single-item array causes search failure)
+</format_rules>
 
-## When to Use deepWiki
+## When to Use DeepWiki
 
-Use deepWiki when:
-
+<use_cases>
 - Query is about a **specific GitHub repository**
 - You need **authoritative code answers** (from official docs)
 - The question involves **implementation details** of a library/framework
 - You want **installation/setup instructions** for a specific tool
 - The query is about **API usage patterns** for a known package
+</use_cases>
 
 ## repoName Format
 
@@ -114,18 +124,16 @@ Always use `owner/repo` format:
 
 ### Getting Started with a Library
 
-**Step 1**: Check documentation structure
 ```json
+// Step 1: Check documentation structure
 {
   "tool": "deepwiki:deepWiki_read_wiki_structure",
   "params": {
     "repoName": "vercel/next.js"
   }
 }
-```
 
-**Step 2**: Ask specific question
-```json
+// Step 2: Ask specific question
 {
   "tool": "deepwiki:deepWiki_ask_question",
   "params": {
@@ -161,18 +169,19 @@ Always use `owner/repo` format:
 
 ## Best Practices
 
+<best_practices>
 1. **Validate repo name** against blocked list before calling
 2. **Use `ask_question`** for specific queries (most efficient)
 3. **Use `read_wiki_contents`** only when you need the full documentation
 4. **Check `read_wiki_structure`** first when exploring unfamiliar repos
-5. **Use string for single repo, array for multiple repos** in `repoName` parameter:
-   - Correct: `repoName="owner/repo"` for single repository
-   - Correct: `repoName=["owner1/repo1", "owner2/repo2"]` for multiple repositories
-   - ❌ Wrong: `repoName=["owner/repo"]` for single repository (causes search failure)
+5. **Use string for single repo, array for multiple repos** in `repoName` parameter
+</best_practices>
 
 ## Limitations
 
+<limitations>
 - Only works for **public GitHub repositories**
-- Documentation must be **indexed by deepWiki**
+- Documentation must be **indexed by DeepWiki**
 - Very new or obscure repos may not be available
 - Cannot access private repositories
+</limitations>
