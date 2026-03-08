@@ -45,11 +45,11 @@ describe("package files validation", () => {
     const packageJsonPath = `${PACKAGE_ROOT}/package.json`;
     const packageJson = JSON.parse(await Bun.file(packageJsonPath).text());
 
-    const pluginContent = await Bun.file(
-      `${PACKAGE_ROOT}/plugin.ts`
+    const installerContent = await Bun.file(
+      `${PACKAGE_ROOT}/src/installer.ts`
     ).text();
 
-    const hasVersionRead = pluginContent.includes('Bun.file(`${import.meta.dirname}/package.json`).text()');
+    const hasVersionRead = installerContent.includes('../package.json');
     expect(hasVersionRead).toBe(true);
 
     expect(packageJson.version).toBeDefined();
