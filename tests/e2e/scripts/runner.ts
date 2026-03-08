@@ -2,7 +2,7 @@ import { $ } from "bun";
 import { join, basename } from "node:path";
 import { mkdir, writeFile, readFile } from "node:fs/promises";
 import type { TestConfig, RunMetrics, AggregatedMetrics, GitMetadata, TokenMetricsReport, ConsistencyReport } from "./types.ts";
-import { initializeSDKTest, type SDKTestContext } from "./sdk-runner.ts";
+import { initializeSDKTest, checkSkillAvailability, type SDKTestContext } from "./sdk-runner.ts";
 import { createEventMonitor, extractSolutions, calculateWorkflowCompliance, type EventMonitor } from "./event-monitor.ts";
 import { setupTestProject, type TestProjectContext } from "./test-project.ts";
 
@@ -89,6 +89,19 @@ async function runSingleTest(
     
     await monitor.waitForCompletion();
     
+    const skillDiscovery = await checkSkillAvailability(
+      context.client,
+      context.sessionId,
+      config.testProjectDir ?? config.projectDir
+    );
+    
+    if (skillDiscovery.available) {
+      console.log(`  ✓ Skill available: ${skillDiscovery.skillName}`);
+      console.log(`    Description: ${skillDiscovery.skillDescription?.slice(0, 100)}...`);
+    } else {
+      console.log(`  ✗ Skill NOT available: ${skillDiscovery.error}`);
+    }
+    
     const elapsed = Math.floor((Date.now() - startTime) / 1000);
     console.log(`  Completed in ${Math.floor(elapsed / 60)}:${(elapsed % 60).toString().padStart(2, "0")}`);
     
@@ -104,6 +117,7 @@ async function runSingleTest(
         totalTokens: 0,
         skillLoaded: false,
         skillLoadMethod: "none",
+        skillDiscovery,
         toolsUsed: [],
         workflowCompliance: {
           usedGhCli: false,
@@ -139,7 +153,8 @@ async function runSingleTest(
       outputTokens: monitor.tokens.output,
       totalTokens: monitor.tokens.input + monitor.tokens.output,
       skillLoaded: monitor.skillDetected,
-      skillLoadMethod: monitor.skillDetected ? "explicit" : "none",
+      skillLoadMethod: monitor.skillLoadMethod,
+      skillDiscovery,
       toolsUsed: [...monitor.toolsUsed],
       workflowCompliance: workflow,
       solutions,

@@ -1,12 +1,59 @@
 import { createServer } from "node:net";
 import { createOpencode } from "@opencode-ai/sdk";
 import type { OpencodeClient } from "@opencode-ai/sdk";
-import type { TestConfig } from "./types.ts";
+import type { TestConfig, SkillDiscovery } from "./types.ts";
 
 export interface SDKTestContext {
   client: OpencodeClient;
   server: { url: string; close: () => void };
   sessionId: string;
+}
+
+export async function checkSkillAvailability(
+  client: OpencodeClient,
+  sessionId: string,
+  projectDir: string
+): Promise<SkillDiscovery> {
+  try {
+    const skillFile = `${projectDir}/.opencode/skills/intellisearch/SKILL.md`;
+    const file = Bun.file(skillFile);
+    const fileExists = await file.exists();
+    
+    if (!fileExists) {
+      return {
+        available: false,
+        skillName: null,
+        skillDescription: null,
+        error: "Skill file not found at expected location",
+      };
+    }
+    
+    const skillContent = await file.text();
+    const nameMatch = skillContent.match(/^name:\s*(.+)$/m);
+    const descMatch = skillContent.match(/^description:\s*(.+)$/m);
+    
+    if (!nameMatch || !descMatch) {
+      return {
+        available: false,
+        skillName: null,
+        skillDescription: null,
+        error: "Skill file exists but missing name or description in frontmatter",
+      };
+    }
+    
+    return {
+      available: true,
+      skillName: nameMatch[1].trim(),
+      skillDescription: descMatch[1].trim(),
+    };
+  } catch (error) {
+    return {
+      available: false,
+      skillName: null,
+      skillDescription: null,
+      error: `Failed to check skills: ${(error as Error).message}`,
+    };
+  }
 }
 
 async function findAvailablePort(startPort: number, maxAttempts: number = 100): Promise<number> {

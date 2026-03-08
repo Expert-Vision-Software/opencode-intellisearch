@@ -1,6 +1,6 @@
 ---
 name: intellisearch
-description: High-precision technical search. Use when the user needs: 1) Real-world code examples from GitHub. 2) Documentation for specific APIs/libraries not found in local files. 3) Comparison of different framework implementations. Mandatory for 'how do I use [X] library' or 'find me a repo that does [Y]' queries.
+description: Use this skill when the user asks to find, search for, or discover JavaScript/TypeScript libraries, frameworks, packages, or GitHub repositories. Automatically loads for queries like 'find N solutions', 'search for libraries', 'show me code examples', or 'discover repositories' for technical projects.
 license: MIT
 compatibility: opencode
 metadata:

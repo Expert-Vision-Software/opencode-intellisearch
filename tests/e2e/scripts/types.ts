@@ -30,6 +30,13 @@ export interface WorkflowCompliance {
   score: number;
 }
 
+export interface SkillDiscovery {
+  available: boolean;
+  skillName: string | null;
+  skillDescription: string | null;
+  error?: string;
+}
+
 export interface RunMetrics {
   timestamp: string;
   inputTokens: number;
@@ -37,6 +44,7 @@ export interface RunMetrics {
   totalTokens: number;
   skillLoaded: boolean;
   skillLoadMethod: "explicit" | "implicit" | "none";
+  skillDiscovery: SkillDiscovery;
   toolsUsed: string[];
   workflowCompliance: WorkflowCompliance;
   solutions: string[];
