@@ -19,12 +19,7 @@ export async function setupTestProject(
   
   const config: Record<string, unknown> = {
     "$schema": "https://opencode.ai/config.json",
-    "plugin": [`file:///${pluginPath.replace(/\\/g, "/")}`],
-    "permission": {
-      "skill": {
-        "intellisearch": "allow"
-      }
-    }
+    "plugin": [`file:///${pluginPath.replace(/\\/g, "/")}`]
   };
   
   if (model) {

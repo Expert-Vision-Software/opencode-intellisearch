@@ -326,3 +326,11 @@ bun publish
 ### Asset Installation
 Source: `assets/` (published directly in package)
 → Plugin copies to: `.opencode/skills/intellisearch/` and `.opencode/commands/search-intelligently.md`
+
+### Config File Modification
+The plugin automatically adds skill permissions to `.opencode/opencode.json`:
+- Reads existing config (or creates new one)
+- Adds `permission.skill.intellisearch: "allow"` if not present
+- Preserves existing config values
+- Runs during config hook (one-time setup)
+- Test project setup no longer needs to manually add permissions
