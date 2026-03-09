@@ -297,6 +297,29 @@ function printComparisonTable(metrics: AggregatedMetrics, baseline: Baseline): v
       " | " + row.delta
     );
   }
+  
+  const breakdown = metrics.runs[0]?.workflowCompliance?.breakdown;
+  if (breakdown) {
+    const parts: string[] = [];
+    if (breakdown.skillLoaded > 0) parts.push(`skill: ${breakdown.skillLoaded.toFixed(2)}`);
+    if (breakdown.ghCli > 0) parts.push(`gh: ${breakdown.ghCli.toFixed(2)}`);
+    if (breakdown.deepWiki > 0) parts.push(`deepWiki: ${breakdown.deepWiki.toFixed(2)}`);
+    if (breakdown.noWebfetchOnGithub > 0) parts.push(`noWebfetch: ${breakdown.noWebfetchOnGithub.toFixed(2)}`);
+    console.log(`\nBreakdown: ${parts.join(", ")}`);
+  }
+  
+  const violations = aggregateViolations(metrics);
+  if (violations.length > 0) {
+    const violationStr = violations.map(v => `${v.rule}: ${v.totalImpact.toFixed(2)}`).join(", ");
+    console.log(`Violations: ${color(violations.length.toString(), "yellow")} (${violationStr})`);
+  } else {
+    console.log(`Violations: ${color("0", "green")}`);
+  }
+  
+  const enhanced = metrics.runs[0]?.workflowCompliance?.enhanced;
+  if (enhanced) {
+    console.log(`Search Depth: ${enhanced.searchDepth} repos examined | Duration: ${formatDuration(enhanced.workflowDuration)}`);
+  }
 }
 
 function printMetricsOnly(metrics: AggregatedMetrics): void {
