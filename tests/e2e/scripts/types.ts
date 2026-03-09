@@ -22,12 +22,35 @@ export interface TestConfig {
   };
 }
 
+export interface ScoreBreakdown {
+  skillLoaded: number;
+  ghCli: number;
+  deepWiki: number;
+  noWebfetchOnGithub: number;
+}
+
+export interface WorkflowViolation {
+  rule: string;
+  detail: string;
+  impact: number;
+}
+
+export interface EnhancedMetrics {
+  toolDiversity: number;
+  searchDepth: number;
+  tokenEfficiency: number;
+  workflowDuration: number;
+}
+
 export interface WorkflowCompliance {
   usedGhCli: boolean;
   usedDeepWiki: boolean;
   usedWebfetch: boolean;
   usedWebfetchOnGithub: boolean;
   score: number;
+  breakdown: ScoreBreakdown;
+  violations: WorkflowViolation[];
+  enhanced: EnhancedMetrics;
 }
 
 export interface SkillDiscovery {
@@ -36,6 +59,8 @@ export interface SkillDiscovery {
   skillDescription: string | null;
   error?: string;
 }
+
+export type ConsistencyLevel = "HIGH" | "MEDIUM" | "LOW";
 
 export interface RunMetrics {
   timestamp: string;
@@ -51,6 +76,7 @@ export interface RunMetrics {
   searchSuccess: boolean;
   earlyFailure?: boolean;
   earlyFailureReason?: string;
+  workflowDuration: number;
 }
 
 export interface AggregatedMetrics {
@@ -69,6 +95,21 @@ export interface Thresholds {
   minWorkflowScore: number;
   maxTokenIncrease: number;
   minSolutionsFound: number;
+  scoreTolerance: number;
+}
+
+export interface Regression {
+  type: "workflow_score" | "token_usage" | "skill_load" | "solutions_found";
+  severity: number;
+  expected: number | string;
+  actual: number | string;
+}
+
+export interface ViolationSummary {
+  rule: string;
+  count: number;
+  totalImpact: number;
+  runs: string[];
 }
 
 export interface Baseline {
@@ -126,6 +167,7 @@ export interface ConsistencyReport {
     jaccardScore: number;
     commonSolutions: string[];
     allSolutions: string[];
+    level: ConsistencyLevel;
   };
   searchSuccessRate: number;
   tokenMetrics: {
@@ -145,6 +187,7 @@ export interface ConsistencyReport {
     runsUsingGhCli: number;
     runsUsingDeepWiki: number;
     runsUsingWebfetch: number;
+    violations: ViolationSummary[];
   };
   meta?: GitMetadata;
   runs: RunMetrics[];

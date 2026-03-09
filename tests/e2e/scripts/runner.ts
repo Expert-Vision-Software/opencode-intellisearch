@@ -1,7 +1,7 @@
 import { $ } from "bun";
 import { join, basename } from "node:path";
 import { mkdir, writeFile, readFile } from "node:fs/promises";
-import type { TestConfig, RunMetrics, AggregatedMetrics, GitMetadata, TokenMetricsReport, ConsistencyReport } from "./types.ts";
+import type { TestConfig, RunMetrics, AggregatedMetrics, GitMetadata, TokenMetricsReport, ConsistencyReport, WorkflowCompliance, ViolationSummary, ConsistencyLevel } from "./types.ts";
 import { initializeSDKTest, checkSkillAvailability, type SDKTestContext } from "./sdk-runner.ts";
 import { createEventMonitor, extractSolutions, calculateWorkflowCompliance, type EventMonitor } from "./event-monitor.ts";
 import { setupTestProject, type TestProjectContext } from "./test-project.ts";
@@ -102,34 +102,47 @@ async function runSingleTest(
       console.log(`  ✗ Skill NOT available: ${skillDiscovery.error}`);
     }
     
-    const elapsed = Math.floor((Date.now() - startTime) / 1000);
-    console.log(`  Completed in ${Math.floor(elapsed / 60)}:${(elapsed % 60).toString().padStart(2, "0")}`);
-    
     const earlyFailure = config.mode === "explicit" && 
                          monitor.toolCallCount >= 5 && 
                          !monitor.skillDetected;
     
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    console.log(`  Completed in ${Math.floor(elapsed / 60)}:${(elapsed % 60).toString().padStart(2, "0")}`);
+    
     if (earlyFailure) {
       return {
         timestamp: `run-${runIndex}-${Date.now()}`,
-        inputTokens: 0,
-        outputTokens: 0,
-        totalTokens: 0,
+        inputTokens: monitor.tokens.input,
+        outputTokens: monitor.tokens.output,
+        totalTokens: monitor.tokens.input + monitor.tokens.output,
         skillLoaded: false,
         skillLoadMethod: "none",
         skillDiscovery,
-        toolsUsed: [],
+        toolsUsed: [...monitor.toolsUsed],
         workflowCompliance: {
           usedGhCli: false,
           usedDeepWiki: false,
           usedWebfetch: false,
           usedWebfetchOnGithub: false,
           score: 0,
+          breakdown: { skillLoaded: 0, ghCli: 0, deepWiki: 0, noWebfetchOnGithub: 0 },
+          violations: [{
+            rule: "explicit_skill_required",
+            detail: "Skill failed to load in explicit mode",
+            impact: -0.3,
+          }],
+          enhanced: {
+            toolDiversity: 0,
+            searchDepth: 0,
+            tokenEfficiency: 0,
+            workflowDuration: elapsed,
+          },
         },
         solutions: [],
         searchSuccess: false,
         earlyFailure: true,
         earlyFailureReason: "EARLY_FAILURE: Skill not loaded after 5 tool calls in explicit mode",
+        workflowDuration: elapsed,
       };
     }
     
@@ -145,7 +158,7 @@ async function runSingleTest(
       .join(" ");
     
     const solutions = extractSolutions(allText);
-    const workflow = calculateWorkflowCompliance(monitor, allText);
+    const workflow = calculateWorkflowCompliance(monitor, allText, config.mode, solutions.length);
     
     return {
       timestamp: `run-${runIndex}-${Date.now()}`,
@@ -159,6 +172,7 @@ async function runSingleTest(
       workflowCompliance: workflow,
       solutions,
       searchSuccess: !earlyFailure && workflow.score >= 0.5,
+      workflowDuration: elapsed,
     };
     
   } catch (error) {
@@ -333,6 +347,7 @@ async function saveConsistencyReport(resultsDir: string, metrics: AggregatedMetr
   }
   
   const avgJaccard = comparisons > 0 ? totalJaccard / comparisons : 0;
+  const consistencyLevel: ConsistencyLevel = avgJaccard >= 0.5 ? "HIGH" : avgJaccard >= 0.3 ? "MEDIUM" : "LOW";
   
   const tokenValues = metrics.runs.map(r => r.totalTokens);
   const avgTokens = tokenValues.reduce((a, b) => a + b, 0) / tokenValues.length || 0;
@@ -351,13 +366,31 @@ async function saveConsistencyReport(resultsDir: string, metrics: AggregatedMetr
   const runsUsingDeepWiki = metrics.runs.filter(r => r.workflowCompliance.usedDeepWiki).length;
   const runsUsingWebfetch = metrics.runs.filter(r => r.workflowCompliance.usedWebfetch).length;
   
+  const violationMap = new Map<string, { count: number; totalImpact: number; runs: string[] }>();
+  for (const run of metrics.runs) {
+    for (const violation of run.workflowCompliance.violations) {
+      const existing = violationMap.get(violation.rule) || { count: 0, totalImpact: 0, runs: [] };
+      existing.count++;
+      existing.totalImpact += violation.impact;
+      existing.runs.push(run.timestamp);
+      violationMap.set(violation.rule, existing);
+    }
+  }
+  const violations: ViolationSummary[] = [...violationMap.entries()].map(([rule, data]) => ({
+    rule,
+    count: data.count,
+    totalImpact: Math.round(data.totalImpact * 100) / 100,
+    runs: data.runs,
+  }));
+  
   const report: ConsistencyReport = {
     generated: new Date().toISOString(),
     runCount: metrics.runs.length,
     consistency: {
       jaccardScore: Math.round(avgJaccard * 100) / 100,
       commonSolutions: [...allSolutionNames],
-      allSolutions: [...allSolutionNames]
+      allSolutions: [...allSolutionNames],
+      level: consistencyLevel,
     },
     searchSuccessRate: metrics.searchSuccessRate,
     tokenMetrics: {
@@ -376,7 +409,8 @@ async function saveConsistencyReport(resultsDir: string, metrics: AggregatedMetr
       averageScore: Math.round(avgWorkflowScore * 100) / 100,
       runsUsingGhCli,
       runsUsingDeepWiki,
-      runsUsingWebfetch
+      runsUsingWebfetch,
+      violations,
     },
     meta: metrics.meta,
     runs: metrics.runs

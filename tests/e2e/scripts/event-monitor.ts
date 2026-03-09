@@ -1,6 +1,15 @@
 import type { OpencodeClient } from "@opencode-ai/sdk";
-import type { TestConfig, WorkflowCompliance } from "./types.ts";
+import type { TestConfig, WorkflowCompliance, WorkflowViolation, ScoreBreakdown, EnhancedMetrics } from "./types.ts";
 import { printToolUse, printStepFinish, clearStatusLine } from "./report.ts";
+
+const SEARCH_TOOLS = new Set([
+  "deepwiki_ask_question",
+  "deepwiki_read_wiki_structure", 
+  "deepwiki_read_wiki_contents",
+  "bash",
+  "webfetch",
+  "google_search",
+]);
 
 export interface EventMonitor {
   toolCallCount: number;
@@ -10,6 +19,9 @@ export interface EventMonitor {
   toolsUsed: Set<string>;
   printedTools: Set<string>;
   bashCommands: string[];
+  reposExamined: Set<string>;
+  deepWikiQuestions: number;
+  startTime: number;
   abort: () => void;
   waitForCompletion: () => Promise<void>;
 }
@@ -68,6 +80,9 @@ export async function createEventMonitor(
     toolsUsed: new Set(),
     printedTools: new Set(),
     bashCommands: [],
+    reposExamined: new Set(),
+    deepWikiQuestions: 0,
+    startTime: Date.now(),
     abort: () => abortController.abort(),
     waitForCompletion: () => {
       const timeoutMs = 600000;
@@ -141,6 +156,18 @@ export async function createEventMonitor(
               }
             }
             
+            if (toolName === "deepwiki_ask_question" || 
+                toolName === "deepwiki_read_wiki_structure" ||
+                toolName === "deepwiki_read_wiki_contents") {
+              const repoName = String(input.repoName || "");
+              if (repoName) {
+                state.reposExamined.add(repoName.toLowerCase());
+              }
+              if (toolName === "deepwiki_ask_question") {
+                state.deepWikiQuestions++;
+              }
+            }
+            
             if (!state.printedTools.has(toolKey)) {
               state.printedTools.add(toolKey);
               printToolUse(part.tool, input, Date.now(), cumulativeTokens);
@@ -209,7 +236,9 @@ export function extractSolutions(text: string): string[] {
 
 export function calculateWorkflowCompliance(
   monitor: EventMonitor,
-  text: string
+  text: string,
+  mode?: "explicit" | "implicit",
+  solutionsFound?: number
 ): WorkflowCompliance {
   const usedGhCli = text.includes("gh search") || text.includes("gh repo");
   const usedDeepWiki = monitor.toolsUsed.has("deepwiki_ask_question") ||
@@ -218,17 +247,76 @@ export function calculateWorkflowCompliance(
   const usedWebfetch = monitor.toolsUsed.has("webfetch");
   const usedWebfetchOnGithub = usedWebfetch && text.includes("github.com");
   
-  let score = 0;
-  if (monitor.skillDetected) score += 0.3;
-  if (usedGhCli) score += 0.25;
-  if (usedDeepWiki) score += 0.25;
-  if (!usedWebfetchOnGithub) score += 0.2;
+  const breakdown: ScoreBreakdown = {
+    skillLoaded: monitor.skillDetected ? 0.3 : 0,
+    ghCli: usedGhCli ? 0.25 : 0,
+    deepWiki: usedDeepWiki ? 0.25 : 0,
+    noWebfetchOnGithub: !usedWebfetchOnGithub ? 0.2 : 0,
+  };
+  
+  const violations: WorkflowViolation[] = [];
+  
+  if (usedWebfetchOnGithub) {
+    violations.push({
+      rule: "no_webfetch_on_github",
+      detail: "Used webfetch on github.com instead of DeepWiki",
+      impact: -0.2,
+    });
+  }
+  
+  if (monitor.skillDetected && !usedDeepWiki) {
+    violations.push({
+      rule: "must_use_deepwiki",
+      detail: "Skill loaded but DeepWiki not used",
+      impact: -0.25,
+    });
+  }
+  
+  if (mode === "explicit" && !monitor.skillDetected) {
+    violations.push({
+      rule: "explicit_skill_required",
+      detail: "Skill failed to load in explicit mode",
+      impact: -0.3,
+    });
+  }
+  
+  const onlyGoogleSearchUsed = monitor.toolsUsed.has("google_search") && 
+                                !monitor.skillDetected &&
+                                monitor.toolCallCount >= 3;
+  if (onlyGoogleSearchUsed) {
+    violations.push({
+      rule: "stuck_on_google_search",
+      detail: "Multiple google_search calls without skill loading",
+      impact: -0.15,
+    });
+  }
+  
+  const usedSearchTools = [...monitor.toolsUsed].filter(t => SEARCH_TOOLS.has(t));
+  const toolDiversity = usedSearchTools.length / SEARCH_TOOLS.size;
+  const searchDepth = monitor.reposExamined.size;
+  const totalTokens = monitor.tokens.input + monitor.tokens.output;
+  const tokenEfficiency = solutionsFound && solutionsFound > 0 
+    ? totalTokens / solutionsFound 
+    : totalTokens;
+  const workflowDuration = Math.floor((Date.now() - monitor.startTime) / 1000);
+  
+  const enhanced: EnhancedMetrics = {
+    toolDiversity: Math.round(toolDiversity * 100) / 100,
+    searchDepth,
+    tokenEfficiency: Math.round(tokenEfficiency),
+    workflowDuration,
+  };
+  
+  const score = Math.min(1, breakdown.skillLoaded + breakdown.ghCli + breakdown.deepWiki + breakdown.noWebfetchOnGithub);
   
   return {
     usedGhCli,
     usedDeepWiki,
     usedWebfetch,
     usedWebfetchOnGithub,
-    score: Math.min(1, score),
+    score,
+    breakdown,
+    violations,
+    enhanced,
   };
 }
