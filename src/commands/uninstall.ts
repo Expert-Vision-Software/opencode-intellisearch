@@ -35,8 +35,14 @@ export async function uninstallCommand(options: UninstallOptions): Promise<void>
 
   const result = await uninstall(scope, process.cwd());
 
-  if (result.removed) {
-    console.log(`\nUninstalled intellisearch from ${scope} location.`);
+  if (result.removed.length > 0) {
+    console.log(`\nUninstalled intellisearch from ${scope} location:`);
+    for (const path of result.removed) {
+      console.log(`  Removed: ${path}`);
+    }
+    if (result.pluginRemoved) {
+      console.log(`  Plugin: removed from config`);
+    }
   } else {
     console.log(`\nIntellisearch was not installed in ${scope} location.`);
   }

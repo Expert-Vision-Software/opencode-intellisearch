@@ -9,7 +9,10 @@ export async function statusCommand(): Promise<void> {
     const versionInfo = result.local.version 
       ? ` (v${result.local.version})` 
       : " (version unknown)";
-    lines.push(`Local: installed${versionInfo}`);
+    const pluginInfo = result.local.pluginInConfig 
+      ? " [plugin in config]" 
+      : "";
+    lines.push(`Local: installed${versionInfo}${pluginInfo}`);
   } else {
     lines.push("Local: not installed");
   }
@@ -18,7 +21,10 @@ export async function statusCommand(): Promise<void> {
     const versionInfo = result.global.version 
       ? ` (v${result.global.version})` 
       : " (version unknown)";
-    lines.push(`Global: installed${versionInfo}`);
+    const pluginInfo = result.global.pluginInConfig 
+      ? " [plugin in config]" 
+      : "";
+    lines.push(`Global: installed${versionInfo}${pluginInfo}`);
   } else {
     lines.push("Global: not installed");
   }

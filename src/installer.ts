@@ -4,30 +4,47 @@ import { join } from "node:path";
 
 export type Scope = "local" | "global";
 
+export interface InstallOptions {
+  configurePermission?: boolean;
+  configureMcp?: boolean;
+  addPluginConfig?: boolean;
+}
+
 export interface InstallResult {
   scope: Scope;
   skillPath: string;
   commandPath: string;
   configPath: string;
   migrated: boolean;
+  permissionConfigured: boolean;
+  mcpConfigured: boolean;
+  pluginAdded: boolean;
 }
 
 export interface UninstallResult {
   scope: Scope;
   removed: string[];
+  pluginRemoved: boolean;
 }
 
 export interface StatusResult {
-  local: { installed: boolean; version: string | null } | null;
-  global: { installed: boolean; version: string | null } | null;
+  local: { installed: boolean; version: string | null; pluginInConfig: boolean } | null;
+  global: { installed: boolean; version: string | null; pluginInConfig: boolean } | null;
 }
 
 const SKILL_NAME = "intellisearch";
 const COMMAND_NAME = "search-intelligently.md";
+const MCP_SERVER_NAME = "deepwiki";
+const MCP_SERVER_URL = "https://mcp.deepwiki.com/mcp";
 
 export async function getPackageVersion(): Promise<string> {
   const content = await Bun.file(`${import.meta.dirname}/../package.json`).text();
   return JSON.parse(content).version;
+}
+
+export async function getPackageName(): Promise<string> {
+  const content = await Bun.file(`${import.meta.dirname}/../package.json`).text();
+  return JSON.parse(content).name;
 }
 
 function getPackageDir(): string {
@@ -110,6 +127,112 @@ async function removeSkillPermission(configPath: string): Promise<void> {
   }
 }
 
+async function addPluginToConfig(configPath: string, pluginName: string): Promise<boolean> {
+  const config = await readJsonConfig(configPath);
+  
+  if (!config.plugin) {
+    config.plugin = [];
+  }
+  
+  const plugins = config.plugin as string[];
+  if (plugins.includes(pluginName)) {
+    return false;
+  }
+  
+  plugins.push(pluginName);
+  config.plugin = plugins;
+  
+  await mkdir(join(configPath, ".."), { recursive: true });
+  await writeFile(configPath, JSON.stringify(config, null, 2));
+  return true;
+}
+
+async function removePluginFromConfig(configPath: string, pluginName: string): Promise<boolean> {
+  const config = await readJsonConfig(configPath);
+  
+  if (!config.plugin) {
+    return false;
+  }
+  
+  const plugins = config.plugin as string[];
+  const index = plugins.indexOf(pluginName);
+  
+  if (index === -1) {
+    return false;
+  }
+  
+  plugins.splice(index, 1);
+  
+  if (plugins.length === 0) {
+    delete config.plugin;
+  } else {
+    config.plugin = plugins;
+  }
+  
+  await mkdir(join(configPath, ".."), { recursive: true });
+  await writeFile(configPath, JSON.stringify(config, null, 2));
+  return true;
+}
+
+async function isPluginInConfig(configPath: string, pluginName: string): Promise<boolean> {
+  const config = await readJsonConfig(configPath);
+  
+  if (!config.plugin) {
+    return false;
+  }
+  
+  const plugins = config.plugin as string[];
+  return plugins.includes(pluginName);
+}
+
+async function hasMcpServer(configPath: string): Promise<boolean> {
+  const config = await readJsonConfig(configPath);
+  
+  if (!config.mcp) {
+    return false;
+  }
+  
+  const mcp = config.mcp as Record<string, unknown>;
+  const lowerKey = MCP_SERVER_NAME.toLowerCase();
+  
+  for (const key of Object.keys(mcp)) {
+    if (key.toLowerCase() === lowerKey) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+async function addMcpServer(configPath: string): Promise<boolean> {
+  const config = await readJsonConfig(configPath);
+  
+  if (!config.mcp) {
+    config.mcp = {};
+  }
+  
+  const mcp = config.mcp as Record<string, unknown>;
+  const lowerKey = MCP_SERVER_NAME.toLowerCase();
+  
+  for (const key of Object.keys(mcp)) {
+    if (key.toLowerCase() === lowerKey) {
+      return false;
+    }
+  }
+  
+  mcp[MCP_SERVER_NAME] = {
+    type: "remote",
+    url: MCP_SERVER_URL,
+    enabled: true,
+  };
+  
+  config.mcp = mcp;
+  
+  await mkdir(join(configPath, ".."), { recursive: true });
+  await writeFile(configPath, JSON.stringify(config, null, 2));
+  return true;
+}
+
 export async function checkMigrationNeeded(projectDir: string): Promise<{
   needed: boolean;
   rootConfigPath: string;
@@ -178,10 +301,18 @@ export async function migrateRootConfig(
 
 export async function install(
   scope: Scope,
-  projectDir: string = process.cwd()
+  projectDir: string = process.cwd(),
+  options: InstallOptions = {}
 ): Promise<InstallResult> {
   const version = await getPackageVersion();
+  const packageName = await getPackageName();
   const pkgDir = getPackageDir();
+  
+  const {
+    configurePermission = true,
+    configureMcp = true,
+    addPluginConfig = true,
+  } = options;
   
   const configBase = scope === "global" 
     ? getGlobalConfigPath() 
@@ -207,7 +338,22 @@ export async function install(
   await Bun.write(commandPath, Bun.file(join(pkgDir, "assets", "commands", COMMAND_NAME)));
   
   await Bun.write(versionMarker, version);
-  await ensureSkillPermission(configPath);
+  
+  let permissionConfigured = false;
+  if (configurePermission) {
+    await ensureSkillPermission(configPath);
+    permissionConfigured = true;
+  }
+  
+  let mcpConfigured = false;
+  if (configureMcp) {
+    mcpConfigured = await addMcpServer(configPath);
+  }
+  
+  let pluginAdded = false;
+  if (addPluginConfig) {
+    pluginAdded = await addPluginToConfig(configPath, packageName);
+  }
   
   return {
     scope,
@@ -215,6 +361,9 @@ export async function install(
     commandPath,
     configPath,
     migrated,
+    permissionConfigured,
+    mcpConfigured,
+    pluginAdded,
   };
 }
 
@@ -222,6 +371,8 @@ export async function uninstall(
   scope: Scope,
   projectDir: string = process.cwd()
 ): Promise<UninstallResult> {
+  const packageName = await getPackageName();
+  
   const configBase = scope === "global" 
     ? getGlobalConfigPath() 
     : getLocalConfigPath(projectDir);
@@ -242,8 +393,10 @@ export async function uninstall(
     removed.push(commandPath);
   }
   
+  let pluginRemoved = false;
   if (await exists(configPath)) {
     await removeSkillPermission(configPath);
+    pluginRemoved = await removePluginFromConfig(configPath, packageName);
   }
   
   const skillsDir = join(configBase, "skills");
@@ -267,38 +420,45 @@ export async function uninstall(
     // Directory doesn't exist
   }
   
-  return { scope, removed };
+  return { scope, removed, pluginRemoved };
 }
 
 export async function status(projectDir: string = process.cwd()): Promise<StatusResult> {
   const version = await getPackageVersion();
+  const packageName = await getPackageName();
   
   const localConfigPath = getLocalConfigPath(projectDir);
   const localVersionMarker = join(localConfigPath, "skills", SKILL_NAME, ".version");
+  const localConfigFile = join(localConfigPath, "opencode.json");
   
   const globalConfigPath = getGlobalConfigPath();
   const globalVersionMarker = join(globalConfigPath, "skills", SKILL_NAME, ".version");
+  const globalConfigFile = join(globalConfigPath, "opencode.json");
   
-  let localStatus: { installed: boolean; version: string | null } | null = null;
-  let globalStatus: { installed: boolean; version: string | null } | null = null;
+  let localStatus: { installed: boolean; version: string | null; pluginInConfig: boolean } | null = null;
+  let globalStatus: { installed: boolean; version: string | null; pluginInConfig: boolean } | null = null;
   
   try {
     const localVersion = (await readFile(localVersionMarker, "utf-8")).trim();
-    localStatus = { installed: true, version: localVersion };
+    const localPluginInConfig = await isPluginInConfig(localConfigFile, packageName);
+    localStatus = { installed: true, version: localVersion, pluginInConfig: localPluginInConfig };
   } catch {
     const skillPath = join(localConfigPath, "skills", SKILL_NAME);
     if (await exists(skillPath)) {
-      localStatus = { installed: true, version: null };
+      const localPluginInConfig = await isPluginInConfig(localConfigFile, packageName);
+      localStatus = { installed: true, version: null, pluginInConfig: localPluginInConfig };
     }
   }
   
   try {
     const globalVersion = (await readFile(globalVersionMarker, "utf-8")).trim();
-    globalStatus = { installed: true, version: globalVersion };
+    const globalPluginInConfig = await isPluginInConfig(globalConfigFile, packageName);
+    globalStatus = { installed: true, version: globalVersion, pluginInConfig: globalPluginInConfig };
   } catch {
     const skillPath = join(globalConfigPath, "skills", SKILL_NAME);
     if (await exists(skillPath)) {
-      globalStatus = { installed: true, version: null };
+      const globalPluginInConfig = await isPluginInConfig(globalConfigFile, packageName);
+      globalStatus = { installed: true, version: null, pluginInConfig: globalPluginInConfig };
     }
   }
   

@@ -3,16 +3,23 @@ import {
   install,
   checkMigrationNeeded,
   type Scope,
+  type InstallOptions,
 } from "../installer.ts";
-import { confirmOverwrite } from "../prompts.ts";
+import {
+  confirmOverwrite,
+  confirmPermissionConfig,
+  confirmMcpConfig,
+  confirmPluginConfig,
+} from "../prompts.ts";
 
-interface InstallOptions {
+interface InstallCommandOptions {
   scope?: Scope;
   force?: boolean;
 }
 
-export async function installCommand(options: InstallOptions): Promise<void> {
+export async function installCommand(options: InstallCommandOptions): Promise<void> {
   let scope: Scope;
+  const interactive = !options.scope;
 
   if (options.scope) {
     scope = options.scope;
@@ -50,7 +57,25 @@ export async function installCommand(options: InstallOptions): Promise<void> {
     }
   }
 
-  const result = await install(scope, projectDir);
+  let installOptions: InstallOptions = {
+    configurePermission: true,
+    configureMcp: true,
+    addPluginConfig: true,
+  };
+
+  if (interactive) {
+    const configurePermission = await confirmPermissionConfig();
+    const configureMcp = await confirmMcpConfig();
+    const addPluginConfig = await confirmPluginConfig();
+    
+    installOptions = {
+      configurePermission,
+      configureMcp,
+      addPluginConfig,
+    };
+  }
+
+  const result = await install(scope, projectDir, installOptions);
 
   console.log(`\nInstalled intellisearch ${scope === "global" ? "globally" : "locally"}:`);
   console.log(`  Skill: ${result.skillPath}`);
@@ -59,5 +84,17 @@ export async function installCommand(options: InstallOptions): Promise<void> {
   
   if (result.migrated) {
     console.log(`  Migrated: opencode.json → .opencode/opencode.json`);
+  }
+  
+  if (result.permissionConfigured) {
+    console.log(`  Permission: skill.intellisearch = "allow"`);
+  }
+  
+  if (result.mcpConfigured) {
+    console.log(`  MCP: deepwiki server configured`);
+  }
+  
+  if (result.pluginAdded) {
+    console.log(`  Plugin: added to config`);
   }
 }

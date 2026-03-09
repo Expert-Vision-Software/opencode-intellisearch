@@ -20,9 +20,17 @@ interface PermissionConfig {
   tool?: Record<string, string>;
 }
 
+interface McpConfig {
+  type: string;
+  url: string;
+  enabled: boolean;
+}
+
 interface OpenencodeConfig {
   model?: string;
   permission?: PermissionConfig;
+  plugin?: string[];
+  mcp?: Record<string, McpConfig>;
 }
 
 function getSkillPermission(config: OpenencodeConfig | null): string | undefined {
@@ -31,6 +39,16 @@ function getSkillPermission(config: OpenencodeConfig | null): string | undefined
 
 function getToolPermission(config: OpenencodeConfig | null, tool: string): string | undefined {
   return config?.permission?.tool?.[tool];
+}
+
+function hasPlugin(config: OpenencodeConfig | null, pluginName: string): boolean {
+  return config?.plugin?.includes(pluginName) ?? false;
+}
+
+function hasMcpServer(config: OpenencodeConfig | null, serverName: string): boolean {
+  if (!config?.mcp) return false;
+  const lowerName = serverName.toLowerCase();
+  return Object.keys(config.mcp).some(key => key.toLowerCase() === lowerName);
 }
 
 describe("install command", () => {
@@ -222,5 +240,177 @@ describe("status command", () => {
 
     expect(result.local?.installed).toBe(true);
     expect(result.global?.installed).toBe(true);
+  });
+
+  it("detects plugin in config", async () => {
+    await install("local", env.projectDir);
+    const result = await status(env.projectDir);
+
+    expect(result.local?.pluginInConfig).toBe(true);
+  });
+});
+
+describe("plugin config", () => {
+  let env: TestEnv;
+
+  beforeEach(async () => {
+    env = await createTestEnv();
+    process.env.XDG_CONFIG_HOME = env.xdgConfigHome;
+  });
+
+  afterEach(async () => {
+    await env.cleanup();
+  });
+
+  it("adds plugin to config by default", async () => {
+    const result = await install("local", env.projectDir);
+    expect(result.pluginAdded).toBe(true);
+
+    const config = await readJsonFile<OpenencodeConfig>(getConfigPath(env.projectDir));
+    expect(hasPlugin(config, "opencode-intellisearch")).toBe(true);
+  });
+
+  it("skips plugin config when option is false", async () => {
+    const result = await install("local", env.projectDir, { addPluginConfig: false });
+    expect(result.pluginAdded).toBe(false);
+
+    const config = await readJsonFile<OpenencodeConfig>(getConfigPath(env.projectDir));
+    expect(hasPlugin(config, "opencode-intellisearch")).toBe(false);
+  });
+
+  it("preserves existing plugins", async () => {
+    env = await createTestEnv({
+      withDotOpenencode: true,
+      withDotOpenencodeJsonContent: {
+        plugin: ["existing-plugin"],
+      },
+    });
+
+    await install("local", env.projectDir);
+
+    const config = await readJsonFile<OpenencodeConfig>(getConfigPath(env.projectDir));
+    expect(hasPlugin(config, "existing-plugin")).toBe(true);
+    expect(hasPlugin(config, "opencode-intellisearch")).toBe(true);
+  });
+
+  it("removes plugin from config on uninstall", async () => {
+    await install("local", env.projectDir);
+    
+    let config = await readJsonFile<OpenencodeConfig>(getConfigPath(env.projectDir));
+    expect(hasPlugin(config, "opencode-intellisearch")).toBe(true);
+
+    const result = await uninstall("local", env.projectDir);
+    expect(result.pluginRemoved).toBe(true);
+
+    config = await readJsonFile<OpenencodeConfig>(getConfigPath(env.projectDir));
+    expect(hasPlugin(config, "opencode-intellisearch")).toBe(false);
+  });
+
+  it("preserves other plugins on uninstall", async () => {
+    env = await createTestEnv({
+      withDotOpenencode: true,
+      withDotOpenencodeJsonContent: {
+        plugin: ["existing-plugin", "opencode-intellisearch"],
+      },
+    });
+
+    await uninstall("local", env.projectDir);
+
+    const config = await readJsonFile<OpenencodeConfig>(getConfigPath(env.projectDir));
+    expect(hasPlugin(config, "existing-plugin")).toBe(true);
+    expect(hasPlugin(config, "opencode-intellisearch")).toBe(false);
+  });
+});
+
+describe("mcp config", () => {
+  let env: TestEnv;
+
+  beforeEach(async () => {
+    env = await createTestEnv();
+    process.env.XDG_CONFIG_HOME = env.xdgConfigHome;
+  });
+
+  afterEach(async () => {
+    await env.cleanup();
+  });
+
+  it("adds deepwiki MCP server by default", async () => {
+    const result = await install("local", env.projectDir);
+    expect(result.mcpConfigured).toBe(true);
+
+    const config = await readJsonFile<OpenencodeConfig>(getConfigPath(env.projectDir));
+    expect(hasMcpServer(config, "deepwiki")).toBe(true);
+    
+    const mcp = config?.mcp?.deepwiki;
+    expect(mcp?.type).toBe("remote");
+    expect(mcp?.url).toBe("https://mcp.deepwiki.com/mcp");
+    expect(mcp?.enabled).toBe(true);
+  });
+
+  it("skips MCP config when option is false", async () => {
+    const result = await install("local", env.projectDir, { configureMcp: false });
+    expect(result.mcpConfigured).toBe(false);
+
+    const config = await readJsonFile<OpenencodeConfig>(getConfigPath(env.projectDir));
+    expect(hasMcpServer(config, "deepwiki")).toBe(false);
+  });
+
+  it("does not duplicate MCP server with different casing", async () => {
+    env = await createTestEnv({
+      withDotOpenencode: true,
+      withDotOpenencodeJsonContent: {
+        mcp: {
+          DeepWiki: {
+            type: "remote",
+            url: "https://mcp.deepwiki.com/mcp",
+            enabled: true,
+          },
+        },
+      },
+    });
+
+    const result = await install("local", env.projectDir);
+    expect(result.mcpConfigured).toBe(false);
+
+    const config = await readJsonFile<OpenencodeConfig>(getConfigPath(env.projectDir));
+    const mcpKeys = Object.keys(config?.mcp || {});
+    expect(mcpKeys.length).toBe(1);
+  });
+
+  it("preserves MCP config on uninstall", async () => {
+    await install("local", env.projectDir);
+    await uninstall("local", env.projectDir);
+
+    const config = await readJsonFile<OpenencodeConfig>(getConfigPath(env.projectDir));
+    expect(hasMcpServer(config, "deepwiki")).toBe(true);
+  });
+});
+
+describe("install options", () => {
+  let env: TestEnv;
+
+  beforeEach(async () => {
+    env = await createTestEnv();
+    process.env.XDG_CONFIG_HOME = env.xdgConfigHome;
+  });
+
+  afterEach(async () => {
+    await env.cleanup();
+  });
+
+  it("skips permission config when option is false", async () => {
+    const result = await install("local", env.projectDir, { configurePermission: false });
+    expect(result.permissionConfigured).toBe(false);
+
+    const config = await readJsonFile<OpenencodeConfig>(getConfigPath(env.projectDir));
+    expect(getSkillPermission(config)).toBeUndefined();
+  });
+
+  it("configures all options by default", async () => {
+    const result = await install("local", env.projectDir);
+
+    expect(result.permissionConfigured).toBe(true);
+    expect(result.mcpConfigured).toBe(true);
+    expect(result.pluginAdded).toBe(true);
   });
 });
