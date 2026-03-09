@@ -280,8 +280,8 @@ export async function runTests(config: TestConfig): Promise<{ metrics: Aggregate
   const runs: RunMetrics[] = [];
   
   try {
-    for (let i = 0; i < testConfig.runs; i++) {
-      console.log(`\nRunning test ${i + 1}/${testConfig.runs}...`);
+    for (let i = 0; i < (testConfig.runs ?? 1); i++) {
+      console.log(`\nRunning test ${i + 1}/${testConfig.runs ?? 1}...`);
       
       const runTimestamp = Date.now();
       const runDirName = `run-${i + 1}-${runTimestamp}`;
@@ -449,7 +449,6 @@ export async function loadResultsDir(resultsDir: string): Promise<AggregatedMetr
 
 export function getDefaultConfig(projectDir: string): TestConfig {
   return {
-    runs: 1,
     mode: "explicit",
     model: null,
     queryFile: "tests/e2e/test-queries/graph-db-search.md",

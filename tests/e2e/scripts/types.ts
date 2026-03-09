@@ -8,7 +8,7 @@ export interface GitMetadata {
 }
 
 export interface TestConfig {
-  runs: number;
+  runs?: number;
   mode: SkillMode;
   model: string | null;
   queryFile: string;

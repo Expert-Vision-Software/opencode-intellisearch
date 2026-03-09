@@ -117,7 +117,7 @@ bun test:e2e --mode both --runs 3
 
 | Flag                     | Description                                          |
 | ------------------------ | ---------------------------------------------------- |
-| `-m, --mode <mode>`      | Test mode: `explicit`, `implicit`, or `both` (default: explicit) |
+| `-m, --mode <mode>`      | Test mode: `explicit`, `implicit`, or `both` (default: explicit). With `--show-results`: filter by mode |
 | `-r, --runs <n>`         | Number of test runs per mode (default: 1)            |
 | `--model <model>`        | Override model (default: pre-configured)             |
 | `--validate`             | Run quick validation test                            |
@@ -148,11 +148,14 @@ bun test:e2e --set-baseline tests/e2e/results/implicit-260309-060729
 # Re-analyze previous run
 bun test:e2e --analyze tests/e2e/results/explicit-260309-055419 --verbose
 
-# Show results from latest run
+# Show results from latest run (any mode)
 bun test:e2e --show-results
 
-# Show latest results with verbose output
-bun test:e2e -s --verbose
+# Show latest results filtered by mode
+bun test:e2e -s --mode implicit
+
+# Show latest explicit results with verbose output
+bun test:e2e --show-results --mode explicit --verbose
 
 # Show results from specific directory
 bun test:e2e --show-results tests/e2e/results/implicit-260309-060729
@@ -283,8 +286,14 @@ tests/e2e/results/implicit-260309-060729/
 Use `--show-results` to quickly view results without re-running tests:
 
 ```bash
-# Show latest results (auto-detects most recent directory)
+# Show latest results (auto-detects most recent directory, any mode)
 bun test:e2e --show-results
+
+# Show latest results filtered by mode
+bun test:e2e -s --mode implicit
+
+# Show latest explicit results
+bun test:e2e --show-results --mode explicit
 
 # Show latest with detailed output
 bun test:e2e -s --verbose
@@ -292,8 +301,8 @@ bun test:e2e -s --verbose
 # Show specific results directory
 bun test:e2e --show-results tests/e2e/results/implicit-260309-060729
 
-# Short form
-bun test:e2e -s tests/e2e/results/explicit-260309-055419 -v
+# Short form with mode filter and verbose
+bun test:e2e -s --mode implicit -v
 ```
 
 ### Local Testing

@@ -88,6 +88,7 @@ Usage: bun test:e2e [options]
 
 Options:
   -m, --mode <mode>        Test mode: explicit, implicit, or both (default: explicit)
+                           With --show-results: filter by mode when finding latest
   -r, --runs <n>           Number of test runs (default: 1)
   --model <model>          Model to use (default: pre-configured)
   --validate               Run validation test (quick check)
@@ -98,6 +99,7 @@ Options:
   -s, --show-results       Show results from latest run or specified directory
                            Without arg: shows latest results
                            With dir: shows results from that directory
+                           Use --mode to filter by mode when finding latest
   -h, --help               Show this help
 
 Examples:
@@ -110,7 +112,8 @@ Examples:
   bun test:e2e --set-baseline                   # Save current as baseline
   bun test:e2e --set-baseline tests/e2e/results/explicit-260306-143205
   bun test:e2e --analyze tests/e2e/results/explicit-260306-143205
-  bun test:e2e --show-results                   # Show latest results
+  bun test:e2e --show-results                   # Show latest results (any mode)
+  bun test:e2e -s --mode implicit               # Show latest implicit results
   bun test:e2e --show-results --verbose         # Show latest with details
   bun test:e2e -s tests/e2e/results/implicit-260309-060729
 `);
@@ -125,7 +128,7 @@ async function dirExists(path: string): Promise<boolean> {
   }
 }
 
-async function findLatestResultsDir(projectDir: string): Promise<string | null> {
+async function findLatestResultsDir(projectDir: string, mode?: SkillMode): Promise<string | null> {
   const resultsDir = join(projectDir, "tests/e2e/results");
   
   if (!(await dirExists(resultsDir))) {
@@ -134,7 +137,13 @@ async function findLatestResultsDir(projectDir: string): Promise<string | null> 
   
   const entries = await readdir(resultsDir, { withFileTypes: true });
   const dirs = entries
-    .filter(e => e.isDirectory() && (e.name.startsWith("explicit-") || e.name.startsWith("implicit-")))
+    .filter(e => {
+      if (!e.isDirectory()) return false;
+      if (mode) {
+        return e.name.startsWith(`${mode}-`);
+      }
+      return e.name.startsWith("explicit-") || e.name.startsWith("implicit-");
+    })
     .map(e => e.name)
     .sort()
     .reverse();
@@ -142,17 +151,23 @@ async function findLatestResultsDir(projectDir: string): Promise<string | null> 
   return dirs.length > 0 ? join(resultsDir, dirs[0]) : null;
 }
 
-async function showResults(resultsPath: string | null, projectDir: string, verbose: boolean = false): Promise<boolean> {
+async function showResults(
+  resultsPath: string | null, 
+  projectDir: string, 
+  verbose: boolean = false,
+  mode?: SkillMode
+): Promise<boolean> {
   let resolvedPath: string;
   
   if (resultsPath === "latest" || resultsPath === null) {
-    const latestDir = await findLatestResultsDir(projectDir);
+    const latestDir = await findLatestResultsDir(projectDir, mode);
     if (!latestDir) {
-      printError("No results directories found in tests/e2e/results/");
+      const modeHint = mode ? ` for ${mode} mode` : "";
+      printError(`No results directories found in tests/e2e/results/${modeHint}`);
       return false;
     }
     resolvedPath = latestDir;
-    console.log(`Showing latest results: ${basename(resolvedPath)}\n`);
+    console.log(`Showing latest ${mode ? mode + " " : ""}results: ${basename(resolvedPath)}\n`);
   } else {
     resolvedPath = resolve(projectDir, resultsPath);
     
@@ -165,7 +180,7 @@ async function showResults(resultsPath: string | null, projectDir: string, verbo
   
   const dirName = basename(resolvedPath);
   const modeMatch = dirName.match(/^(explicit|implicit)-/);
-  const mode: SkillMode = modeMatch ? (modeMatch[1] as SkillMode) : "explicit";
+  const resultsMode: SkillMode = modeMatch ? (modeMatch[1] as SkillMode) : "explicit";
   
   const metrics = await loadResultsDir(resolvedPath);
   
@@ -174,7 +189,7 @@ async function showResults(resultsPath: string | null, projectDir: string, verbo
     return false;
   }
   
-  const baseline = await loadBaseline(projectDir, mode);
+  const baseline = await loadBaseline(projectDir, resultsMode);
   const result = evaluateResult(metrics, baseline);
   
   printResult(result, verbose);
@@ -190,7 +205,7 @@ async function runSingleMode(
 ): Promise<{ passed: boolean; resultsDir: string }> {
   const testConfig: TestConfig = { ...config, mode };
   
-  printHeader(mode, testConfig.runs, testConfig.model);
+  printHeader(mode, testConfig.runs ?? 1, testConfig.model);
   
   const { metrics, resultsDir } = await runTests(testConfig);
   
@@ -199,7 +214,7 @@ async function runSingleMode(
       config.projectDir,
       mode,
       metrics,
-      { runs: config.runs, model: config.model, queryFile: config.queryFile }
+      { runs: testConfig.runs ?? 1, model: config.model, queryFile: config.queryFile }
     );
     printBaselineSaved(mode);
   }
@@ -345,7 +360,8 @@ async function main(): Promise<void> {
   }
   
   if (args.showResults !== null) {
-    const passed = await showResults(args.showResults, projectDir, args.verbose);
+    const modeFilter = args.mode === "both" ? undefined : args.mode;
+    const passed = await showResults(args.showResults, projectDir, args.verbose, modeFilter);
     process.exit(passed ? 0 : 1);
     return;
   }
