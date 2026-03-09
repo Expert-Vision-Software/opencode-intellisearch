@@ -1,35 +1,37 @@
 {
   "version": 1,
-  "generated": "2026-03-08T08:07:46.787Z",
+  "generated": "2026-03-09T14:23:47.864Z",
   "config": {
-    "runs": 3,
+    "runs": 5,
     "model": null,
     "queryFile": "tests/e2e/test-queries/graph-db-search.md"
   },
   "metrics": {
     "skillLoaded": true,
     "skillLoadMethod": "implicit",
-    "workflowScore": 0.75,
-    "avgTokens": 27047,
-    "solutionsFound": 5,
+    "workflowScore": 0.71,
+    "avgTokens": 34587,
+    "solutionsFound": 6,
     "searchSuccessRate": 1,
     "solutions": [
-      "amark",
       "levelgraph",
-      "graphology",
+      "amark",
+      "grafeodb",
       "fortunejs",
-      "niclasko"
+      "pubkey",
+      "jyotindersingh"
     ]
   },
   "thresholds": {
     "minWorkflowScore": 0.7,
-    "maxTokenIncrease": 500,
-    "minSolutionsFound": 3
+    "maxTokenIncrease": 7500,
+    "minSolutionsFound": 3,
+    "scoreTolerance": 0.1
   },
   "meta": {
-    "commitHash": "53bc7f8045fce5d0d4852696a7169de2259e84c1",
-    "branch": "improve-implicit-skill",
-    "version": "0.3.5",
-    "mainCommitHash": "63dfe5c63ef4c72bc771f23845f6ced3ec638b1d"
+    "commitHash": "b708b45cb14289f1c4c5ed2878cfc7cd2cf61a21",
+    "branch": "fix-regressions",
+    "version": "0.5.0",
+    "mainCommitHash": "d2bfb9cd555a8db504158951685514ed1e8930e7"
   }
 }

@@ -1,6 +1,23 @@
-import { tmpdir } from "node:os";
+import { tmpdir, homedir } from "node:os";
 import { join } from "node:path";
-import { mkdir, writeFile, rm, symlink, cp } from "node:fs/promises";
+import { mkdir, writeFile, rm, symlink, cp, exists } from "node:fs/promises";
+
+function getGlobalCachePath(): string {
+  const xdgConfig = process.env.XDG_CONFIG_HOME;
+  if (xdgConfig) {
+    return join(xdgConfig, "..", ".cache", "opencode", "node_modules", "opencode-intellisearch");
+  }
+  return join(homedir(), ".cache", "opencode", "node_modules", "opencode-intellisearch");
+}
+
+async function cleanupStaleGlobalInstall(): Promise<void> {
+  const globalPath = getGlobalCachePath();
+  try {
+    if (await exists(globalPath)) {
+      await rm(globalPath, { recursive: true, force: true });
+    }
+  } catch {}
+}
 
 export interface TestProjectContext {
   directory: string;
@@ -12,6 +29,8 @@ export async function setupTestProject(
   queryFileDir: string,
   model: string | null
 ): Promise<TestProjectContext> {
+  await cleanupStaleGlobalInstall();
+  
   const timestamp = Date.now();
   const projectDir = join(tmpdir(), `opencode-e2e-${timestamp}`);
   

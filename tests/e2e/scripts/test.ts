@@ -1,5 +1,5 @@
 import { resolve, basename, join } from "node:path";
-import { stat } from "node:fs/promises";
+import { stat, readdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import type { SkillMode, TestConfig } from "./types.ts";
@@ -14,7 +14,9 @@ interface CliArgs {
   setBaseline: boolean;
   baselinePath: string | null;
   analyze: string | null;
+  showResults: string | null;
   validate: boolean;
+  verbose: boolean;
   help: boolean;
 }
 
@@ -26,7 +28,9 @@ function parseArgs(args: string[]): CliArgs {
     setBaseline: false,
     baselinePath: null,
     analyze: null,
+    showResults: null,
     validate: false,
+    verbose: false,
     help: false
   };
   
@@ -35,8 +39,10 @@ function parseArgs(args: string[]): CliArgs {
     
     if (arg === "--help" || arg === "-h") {
       result.help = true;
-    } else if (arg === "--validate" || arg === "-v") {
+    } else if (arg === "--validate") {
       result.validate = true;
+    } else if (arg === "--verbose") {
+      result.verbose = true;
     } else if (arg === "--mode" || arg === "-m") {
       const value = args[++i];
       if (value === "explicit" || value === "implicit" || value === "both") {
@@ -60,6 +66,14 @@ function parseArgs(args: string[]): CliArgs {
       }
     } else if (arg === "--analyze" || arg === "-a") {
       result.analyze = args[++i] ?? null;
+    } else if (arg === "--show-results" || arg === "-s") {
+      const next = args[i + 1];
+      if (next && !next.startsWith("-")) {
+        result.showResults = next;
+        i++;
+      } else {
+        result.showResults = "latest";
+      }
     }
   }
   
@@ -74,12 +88,18 @@ Usage: bun test:e2e [options]
 
 Options:
   -m, --mode <mode>        Test mode: explicit, implicit, or both (default: explicit)
+                           With --show-results: filter by mode when finding latest
   -r, --runs <n>           Number of test runs (default: 1)
   --model <model>          Model to use (default: pre-configured)
-  -v, --validate           Run validation test (quick check)
+  --validate               Run validation test (quick check)
+  --verbose                Show detailed output with breakdown, violations, baseline comparison
   -b, --set-baseline       Save results as new baseline
                            Optionally provide path to existing results dir
   -a, --analyze <dir>      Re-analyze existing results
+  -s, --show-results       Show results from latest run or specified directory
+                           Without arg: shows latest results
+                           With dir: shows results from that directory
+                           Use --mode to filter by mode when finding latest
   -h, --help               Show this help
 
 Examples:
@@ -88,9 +108,14 @@ Examples:
   bun test:e2e --mode implicit                  # Test implicit mode
   bun test:e2e --mode both                      # Test both modes
   bun test:e2e --runs 3                         # Multiple runs
+  bun test:e2e --verbose                        # Detailed output
   bun test:e2e --set-baseline                   # Save current as baseline
-  bun test:e2e --set-baseline results/explicit-260306-143205
-  bun test:e2e --analyze results/explicit-260306-143205
+  bun test:e2e --set-baseline tests/e2e/results/explicit-260306-143205
+  bun test:e2e --analyze tests/e2e/results/explicit-260306-143205
+  bun test:e2e --show-results                   # Show latest results (any mode)
+  bun test:e2e -s --mode implicit               # Show latest implicit results
+  bun test:e2e --show-results --verbose         # Show latest with details
+  bun test:e2e -s tests/e2e/results/implicit-260309-060729
 `);
 }
 
@@ -103,14 +128,84 @@ async function dirExists(path: string): Promise<boolean> {
   }
 }
 
+async function findLatestResultsDir(projectDir: string, mode?: SkillMode): Promise<string | null> {
+  const resultsDir = join(projectDir, "tests/e2e/results");
+  
+  if (!(await dirExists(resultsDir))) {
+    return null;
+  }
+  
+  const entries = await readdir(resultsDir, { withFileTypes: true });
+  const dirs = entries
+    .filter(e => {
+      if (!e.isDirectory()) return false;
+      if (mode) {
+        return e.name.startsWith(`${mode}-`);
+      }
+      return e.name.startsWith("explicit-") || e.name.startsWith("implicit-");
+    })
+    .map(e => e.name)
+    .sort()
+    .reverse();
+  
+  return dirs.length > 0 ? join(resultsDir, dirs[0]) : null;
+}
+
+async function showResults(
+  resultsPath: string | null, 
+  projectDir: string, 
+  verbose: boolean = false,
+  mode?: SkillMode
+): Promise<boolean> {
+  let resolvedPath: string;
+  
+  if (resultsPath === "latest" || resultsPath === null) {
+    const latestDir = await findLatestResultsDir(projectDir, mode);
+    if (!latestDir) {
+      const modeHint = mode ? ` for ${mode} mode` : "";
+      printError(`No results directories found in tests/e2e/results/${modeHint}`);
+      return false;
+    }
+    resolvedPath = latestDir;
+    console.log(`Showing latest ${mode ? mode + " " : ""}results: ${basename(resolvedPath)}\n`);
+  } else {
+    resolvedPath = resolve(projectDir, resultsPath);
+    
+    if (!(await dirExists(resolvedPath))) {
+      printError(`Results directory not found: ${resolvedPath}`);
+      return false;
+    }
+    console.log(`Showing results from: ${basename(resolvedPath)}\n`);
+  }
+  
+  const dirName = basename(resolvedPath);
+  const modeMatch = dirName.match(/^(explicit|implicit)-/);
+  const resultsMode: SkillMode = modeMatch ? (modeMatch[1] as SkillMode) : "explicit";
+  
+  const metrics = await loadResultsDir(resolvedPath);
+  
+  if (!metrics) {
+    printError("Failed to load results");
+    return false;
+  }
+  
+  const baseline = await loadBaseline(projectDir, resultsMode);
+  const result = evaluateResult(metrics, baseline);
+  
+  printResult(result, verbose);
+  
+  return result.passed;
+}
+
 async function runSingleMode(
   mode: SkillMode, 
   config: TestConfig, 
-  setBaseline: boolean
+  setBaseline: boolean,
+  verbose: boolean = false
 ): Promise<{ passed: boolean; resultsDir: string }> {
   const testConfig: TestConfig = { ...config, mode };
   
-  printHeader(mode, testConfig.runs, testConfig.model);
+  printHeader(mode, testConfig.runs ?? 1, testConfig.model);
   
   const { metrics, resultsDir } = await runTests(testConfig);
   
@@ -119,7 +214,7 @@ async function runSingleMode(
       config.projectDir,
       mode,
       metrics,
-      { runs: config.runs, model: config.model, queryFile: config.queryFile }
+      { runs: testConfig.runs ?? 1, model: config.model, queryFile: config.queryFile }
     );
     printBaselineSaved(mode);
   }
@@ -127,13 +222,13 @@ async function runSingleMode(
   const baseline = await loadBaseline(config.projectDir, mode);
   const result = evaluateResult(metrics, baseline);
   
-  printResult(result);
+  printResult(result, verbose);
   printResultsPath(resultsDir);
   
   return { passed: result.passed, resultsDir };
 }
 
-async function analyzeResults(resultsPath: string, projectDir: string): Promise<boolean> {
+async function analyzeResults(resultsPath: string, projectDir: string, verbose: boolean = false): Promise<boolean> {
   const resolvedPath = resolve(projectDir, resultsPath);
   
   if (!(await dirExists(resolvedPath))) {
@@ -157,7 +252,7 @@ async function analyzeResults(resultsPath: string, projectDir: string): Promise<
   const baseline = await loadBaseline(projectDir, mode);
   const result = evaluateResult(metrics, baseline);
   
-  printResult(result);
+  printResult(result, verbose);
   
   return result.passed;
 }
@@ -264,6 +359,13 @@ async function main(): Promise<void> {
     return;
   }
   
+  if (args.showResults !== null) {
+    const modeFilter = args.mode === "both" ? undefined : args.mode;
+    const passed = await showResults(args.showResults, projectDir, args.verbose, modeFilter);
+    process.exit(passed ? 0 : 1);
+    return;
+  }
+  
   const config = getDefaultConfig(projectDir);
   
   config.runs = args.runs;
@@ -271,7 +373,7 @@ async function main(): Promise<void> {
   
   try {
     if (args.analyze) {
-      const passed = await analyzeResults(args.analyze, projectDir);
+      const passed = await analyzeResults(args.analyze, projectDir, args.verbose);
       process.exit(passed ? 0 : 1);
       return;
     }
@@ -285,15 +387,15 @@ async function main(): Promise<void> {
     let allPassed = true;
     
     if (args.mode === "both") {
-      const explicitResult = await runSingleMode("explicit", config, args.setBaseline);
+      const explicitResult = await runSingleMode("explicit", config, args.setBaseline, args.verbose);
       allPassed = explicitResult.passed && allPassed;
       
       console.log("");
       
-      const implicitResult = await runSingleMode("implicit", config, args.setBaseline);
+      const implicitResult = await runSingleMode("implicit", config, args.setBaseline, args.verbose);
       allPassed = implicitResult.passed && allPassed;
     } else {
-      const result = await runSingleMode(args.mode, config, args.setBaseline);
+      const result = await runSingleMode(args.mode, config, args.setBaseline, args.verbose);
       allPassed = result.passed;
     }
     

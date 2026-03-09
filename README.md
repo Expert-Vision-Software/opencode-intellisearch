@@ -94,6 +94,30 @@ Configure in `~/.config/opencode/opencode.json` or project `opencode.json`:
 4. **Query DeepWiki** → Ask questions about detected repositories
 5. **Return Results** → Present authoritative answers from repository documentation
 
+```mermaid
+flowchart TD
+    A[User Query] --> B{Detect Available Tools}
+    
+    B -->|gh CLI Authenticated| C[GitHub API Search]
+    B -->|Search Tool Available| D[Web Search<br/>site:github.com]
+    B -->|Fetch Tool Only| E[URI Search<br/>Brave → DDG → Google]
+    
+    C --> F[GitHub Repositories]
+    D --> G[Extract owner/repo]
+    E --> G
+    
+    G --> F
+    F --> H[Query DeepWiki]
+    H --> I[Return Answers]
+    
+    style A fill:#e1f5ff
+    style I fill:#d4edda
+    style C fill:#fff3cd
+    style D fill:#fff3cd
+    style E fill:#fff3cd
+    style H fill:#f8d7da
+```
+
 ## Documentation
 
 - [Installation](INSTALLATION.md)

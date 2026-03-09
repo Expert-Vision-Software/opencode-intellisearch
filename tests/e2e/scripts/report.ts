@@ -1,4 +1,4 @@
-import type { TestResult, SkillMode, AggregatedMetrics, Baseline } from "./types.ts";
+import type { TestResult, SkillMode, AggregatedMetrics, Baseline, ViolationSummary, ConsistencyLevel } from "./types.ts";
 
 const COLORS = {
   reset: "\x1b[0m",
@@ -7,7 +7,8 @@ const COLORS = {
   red: "\x1b[31m",
   yellow: "\x1b[33m",
   dim: "\x1b[2m",
-  bold: "\x1b[1m"
+  bold: "\x1b[1m",
+  magenta: "\x1b[35m"
 };
 
 function color(text: string, c: keyof typeof COLORS): string {
@@ -93,12 +94,14 @@ export function printHeader(mode: SkillMode, runs: number, model: string | null)
   console.log("");
 }
 
-export function printResult(result: TestResult): void {
+export function printResult(result: TestResult, verbose: boolean = false): void {
   const { metrics, baseline, checks, passed } = result;
   
   console.log(color("=== Results ===", "cyan"));
   
-  if (baseline) {
+  if (verbose) {
+    printVerboseOutput(metrics, baseline);
+  } else if (baseline) {
     printComparisonTable(metrics, baseline);
   } else {
     printMetricsOnly(metrics);
@@ -124,6 +127,120 @@ export function printResult(result: TestResult): void {
   } else {
     console.log(color("\nNo baseline found. Run `bun test:e2e --set-baseline` to create one.", "yellow"));
   }
+}
+
+function printVerboseOutput(metrics: AggregatedMetrics, baseline: Baseline | null): void {
+  console.log(color("\n--- Workflow Compliance ---", "magenta"));
+  
+  const breakdown = metrics.runs[0]?.workflowCompliance?.breakdown;
+  if (breakdown) {
+    console.log(`  Skill Loaded:      ${formatBool(metrics.skillLoaded)} (${metrics.skillLoadMethod})`);
+    console.log(`  Workflow Score:    ${metrics.workflowScore.toFixed(2)}`);
+    console.log(color("  Breakdown:", "dim"));
+    console.log(`    skillLoaded:        +${breakdown.skillLoaded.toFixed(2)}`);
+    console.log(`    ghCli:               +${breakdown.ghCli.toFixed(2)}`);
+    console.log(`    deepWiki:            +${breakdown.deepWiki.toFixed(2)}`);
+    console.log(`    noWebfetchOnGithub:  +${breakdown.noWebfetchOnGithub.toFixed(2)}`);
+  } else {
+    console.log(`  Skill Loaded:      ${formatBool(metrics.skillLoaded)} (${metrics.skillLoadMethod})`);
+    console.log(`  Workflow Score:    ${metrics.workflowScore.toFixed(2)}`);
+  }
+  
+  console.log(color("\n--- Solutions ---", "magenta"));
+  console.log(`  Found: ${metrics.solutionsFound}`);
+  if (metrics.solutions.length > 0) {
+    for (const sol of metrics.solutions.slice(0, 10)) {
+      console.log(`    - ${sol}`);
+    }
+    if (metrics.solutions.length > 10) {
+      console.log(color(`    ... and ${metrics.solutions.length - 10} more`, "dim"));
+    }
+  }
+  
+  const violations = aggregateViolations(metrics);
+  if (violations.length > 0) {
+    console.log(color("\n--- Violations ---", "magenta"));
+    for (const v of violations) {
+      console.log(`  ${color("⚠️", "yellow")} ${v.rule} (${v.totalImpact.toFixed(2)})`);
+      console.log(color(`      ${v.detail}`, "dim"));
+    }
+  }
+  
+  const enhanced = metrics.runs[0]?.workflowCompliance?.enhanced;
+  if (enhanced) {
+    console.log(color("\n--- Enhanced Metrics ---", "magenta"));
+    console.log(`  Tool Diversity:    ${(enhanced.toolDiversity * 100).toFixed(0)}%`);
+    console.log(`  Search Depth:      ${enhanced.searchDepth} repos examined`);
+    console.log(`  Token Efficiency:  ${enhanced.tokenEfficiency.toLocaleString()} tokens/solution`);
+    console.log(`  Duration:          ${formatDuration(enhanced.workflowDuration)}`);
+  }
+  
+  console.log(color("\n--- Run Summary ---", "magenta"));
+  for (let i = 0; i < metrics.runs.length; i++) {
+    const run = metrics.runs[i];
+    const violationCount = run.workflowCompliance.violations.length;
+    const violationStr = violationCount > 0 
+      ? color(`, ${violationCount} violation${violationCount > 1 ? "s" : ""}`, "yellow")
+      : "";
+    console.log(`  Run ${i + 1}: score ${run.workflowCompliance.score.toFixed(2)}, ${run.solutions.length} solutions${violationStr}`);
+  }
+  
+  if (baseline) {
+    console.log(color("\n--- Baseline Comparison ---", "magenta"));
+    printBaselineComparison(metrics, baseline);
+  }
+}
+
+function aggregateViolations(metrics: AggregatedMetrics): Array<{ rule: string; totalImpact: number; detail: string }> {
+  const violationMap = new Map<string, { totalImpact: number; detail: string }>();
+  
+  for (const run of metrics.runs) {
+    for (const v of run.workflowCompliance.violations) {
+      const existing = violationMap.get(v.rule);
+      if (existing) {
+        existing.totalImpact += v.impact;
+      } else {
+        violationMap.set(v.rule, { totalImpact: v.impact, detail: v.detail });
+      }
+    }
+  }
+  
+  return [...violationMap.entries()].map(([rule, data]) => ({
+    rule,
+    totalImpact: Math.round(data.totalImpact * 100) / 100,
+    detail: data.detail,
+  }));
+}
+
+function printBaselineComparison(metrics: AggregatedMetrics, baseline: Baseline): void {
+  const rows = [
+    { label: "Workflow Score", current: metrics.workflowScore, baseline: baseline.metrics.workflowScore },
+    { label: "Tokens", current: metrics.avgTokens, baseline: baseline.metrics.avgTokens },
+    { label: "Solutions", current: metrics.solutionsFound, baseline: baseline.metrics.solutionsFound },
+    { label: "Search Success", current: metrics.searchSuccessRate, baseline: baseline.metrics.searchSuccessRate },
+  ];
+  
+  for (const row of rows) {
+    const delta = row.current - row.baseline;
+    const deltaStr = formatDeltaWithColor(delta, row.label === "Tokens");
+    console.log(`  ${row.label.padEnd(18)} ${row.current.toFixed ? row.current.toFixed(2) : row.current} (baseline: ${row.baseline.toFixed ? row.baseline.toFixed(2) : row.baseline}) ${deltaStr}`);
+  }
+}
+
+function formatDeltaWithColor(delta: number, inverse: boolean = false): string {
+  if (Math.abs(delta) < 0.001) return color("=", "dim");
+  const isPositive = inverse ? delta < 0 : delta > 0;
+  const arrow = delta > 0 ? "↑" : "↓";
+  const value = Math.abs(delta).toFixed(delta < 1 && delta > -1 ? 2 : 0);
+  return isPositive 
+    ? color(`+${value} ${arrow}`, "green")
+    : color(`-${value} ${arrow}`, "red");
+}
+
+function formatDuration(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
 function printComparisonTable(metrics: AggregatedMetrics, baseline: Baseline): void {
@@ -180,14 +297,62 @@ function printComparisonTable(metrics: AggregatedMetrics, baseline: Baseline): v
       " | " + row.delta
     );
   }
+  
+  const breakdown = metrics.runs[0]?.workflowCompliance?.breakdown;
+  if (breakdown) {
+    const parts: string[] = [];
+    if (breakdown.skillLoaded > 0) parts.push(`skill: ${breakdown.skillLoaded.toFixed(2)}`);
+    if (breakdown.ghCli > 0) parts.push(`gh: ${breakdown.ghCli.toFixed(2)}`);
+    if (breakdown.deepWiki > 0) parts.push(`deepWiki: ${breakdown.deepWiki.toFixed(2)}`);
+    if (breakdown.noWebfetchOnGithub > 0) parts.push(`noWebfetch: ${breakdown.noWebfetchOnGithub.toFixed(2)}`);
+    console.log(`\nBreakdown: ${parts.join(", ")}`);
+  }
+  
+  const violations = aggregateViolations(metrics);
+  if (violations.length > 0) {
+    const violationStr = violations.map(v => `${v.rule}: ${v.totalImpact.toFixed(2)}`).join(", ");
+    console.log(`Violations: ${color(violations.length.toString(), "yellow")} (${violationStr})`);
+  } else {
+    console.log(`Violations: ${color("0", "green")}`);
+  }
+  
+  const enhanced = metrics.runs[0]?.workflowCompliance?.enhanced;
+  if (enhanced) {
+    console.log(`Search Depth: ${enhanced.searchDepth} repos examined | Duration: ${formatDuration(enhanced.workflowDuration)}`);
+  }
 }
 
 function printMetricsOnly(metrics: AggregatedMetrics): void {
-  console.log(`Skill Loaded:     ${formatBool(metrics.skillLoaded)}`);
-  console.log(`Workflow Score:   ${metrics.workflowScore.toFixed(2)}`);
-  console.log(`Tokens:           ${metrics.avgTokens}`);
-  console.log(`Solutions:        ${metrics.solutionsFound}`);
-  console.log(`Search Success:   ${formatPercent(metrics.searchSuccessRate)}`);
+  const breakdown = metrics.runs[0]?.workflowCompliance?.breakdown;
+  const enhanced = metrics.runs[0]?.workflowCompliance?.enhanced;
+  const violations = aggregateViolations(metrics);
+  
+  console.log(`Skill Loaded:     ${formatBool(metrics.skillLoaded)} (${metrics.skillLoadMethod})`);
+  
+  if (breakdown) {
+    const parts = [];
+    if (breakdown.skillLoaded > 0) parts.push(`skill: ${breakdown.skillLoaded.toFixed(2)}`);
+    if (breakdown.ghCli > 0) parts.push(`gh: ${breakdown.ghCli.toFixed(2)}`);
+    if (breakdown.deepWiki > 0) parts.push(`deepWiki: ${breakdown.deepWiki.toFixed(2)}`);
+    if (breakdown.noWebfetchOnGithub > 0) parts.push(`noWebfetch: ${breakdown.noWebfetchOnGithub.toFixed(2)}`);
+    console.log(`Workflow Score:   ${metrics.workflowScore.toFixed(2)} (${parts.join(", ")})`);
+  } else {
+    console.log(`Workflow Score:   ${metrics.workflowScore.toFixed(2)}`);
+  }
+  
+  console.log(`Solutions:        ${metrics.solutionsFound} (${metrics.solutions.slice(0, 3).join(", ")}${metrics.solutions.length > 3 ? "..." : ""})`);
+  
+  if (violations.length > 0) {
+    const violationStr = violations.map(v => `${v.rule}: ${v.totalImpact.toFixed(2)}`).join(", ");
+    console.log(`Violations:       ${color(violations.length.toString(), "yellow")} (${violationStr})`);
+  } else {
+    console.log(`Violations:       ${color("0", "green")}`);
+  }
+  
+  if (enhanced) {
+    console.log(`Search Depth:     ${enhanced.searchDepth} repos examined`);
+    console.log(`Duration:         ${formatDuration(enhanced.workflowDuration)}`);
+  }
 }
 
 function formatDelta(current: number, baselineVal: number): string {

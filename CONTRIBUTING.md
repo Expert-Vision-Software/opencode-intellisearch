@@ -92,27 +92,218 @@ bun run test:watch  # Watch mode
 
 ### E2E Tests
 
+E2E tests validate the complete workflow using the OpenCode SDK with real LLM calls.
+
+#### Basic Usage
+
 ```bash
-# Quick test (explicit mode)
+# Quick test (explicit mode, 1 run)
 bun test:e2e
 
 # Test implicit mode
 bun test:e2e --mode implicit
 
-# Both modes
+# Test both modes sequentially
 bun test:e2e --mode both
 
-# Multiple runs
+# Multiple runs for consistency analysis
 bun test:e2e --runs 3
 
-# Set baseline
-bun test:e2e --set-baseline
+# Multiple runs on both modes
+bun test:e2e --mode both --runs 3
 ```
 
-**Pass Criteria:**
-- Skill loaded: true
-- Workflow score: ≥ 0.70
-- No regression in token usage/solutions/search success
+#### CLI Options
+
+| Flag                     | Description                                          |
+| ------------------------ | ---------------------------------------------------- |
+| `-m, --mode <mode>`      | Test mode: `explicit`, `implicit`, or `both` (default: explicit). With `--show-results`: filter by mode |
+| `-r, --runs <n>`         | Number of test runs per mode (default: 1)            |
+| `--model <model>`        | Override model (default: pre-configured)             |
+| `--validate`             | Run quick validation test                            |
+| `--verbose`              | Show detailed output with breakdown and violations   |
+| `-b, --set-baseline`     | Save current results as baseline                     |
+| `-a, --analyze <dir>`    | Re-analyze existing results directory                |
+| `-s, --show-results`     | Show results from latest or specified directory      |
+| `-h, --help`             | Show help                                            |
+
+#### Examples
+
+```bash
+# Quick validation (simple query, fast check)
+bun test:e2e --validate
+
+# Standard test with baseline comparison
+bun test:e2e --mode implicit --runs 3
+
+# Detailed output with all metrics
+bun test:e2e --verbose --runs 3
+
+# Set new baseline after improvements
+bun test:e2e --set-baseline
+
+# Set baseline from specific results
+bun test:e2e --set-baseline tests/e2e/results/implicit-260309-060729
+
+# Re-analyze previous run
+bun test:e2e --analyze tests/e2e/results/explicit-260309-055419 --verbose
+
+# Show results from latest run (any mode)
+bun test:e2e --show-results
+
+# Show latest results filtered by mode
+bun test:e2e -s --mode implicit
+
+# Show latest explicit results with verbose output
+bun test:e2e --show-results --mode explicit --verbose
+
+# Show results from specific directory
+bun test:e2e --show-results tests/e2e/results/implicit-260309-060729
+```
+
+#### Output Formats
+
+**Default Output:**
+```
+=== Results ===
+Metric          | Baseline | Current | Delta
+--------------------------------------------------
+Skill Loaded    | ✅ yes   | ✅ yes  | =
+Workflow Score  | 0.75     | 0.68    | -0.07 ↓
+Tokens          | 27047    | 32846   | +5799 ↑
+Solutions       | 5        | 5       | =
+Search Success  | 100%     | 100%    | =
+
+Breakdown: skill: 0.30, deepWiki: 0.25, noWebfetch: 0.13
+Violations: 1 (excessive_post_deepwiki_search: -0.08)
+Search Depth: 3 repos examined | Duration: 2:45
+
+Pass Criteria:
+  ✅ Skill loaded: yes
+  ✅ Workflow score: 0.68
+
+Status: ✅ PASS
+```
+
+**Verbose Output (`--verbose`):**
+```
+=== Results ===
+
+--- Workflow Compliance ---
+  Skill Loaded:      ✅ yes (implicit)
+  Workflow Score:    0.68
+  Breakdown:
+    skillLoaded:        +0.30
+    ghCli:               +0.00
+    deepWiki:            +0.25
+    noWebfetchOnGithub:  +0.13
+
+--- Solutions ---
+  Found: 5
+    - amark
+    - levelgraph
+    - quadstorejs
+    - graphology
+    - dxnn
+
+--- Violations ---
+  ⚠️ excessive_post_deepwiki_search (-0.08)
+      4 search tool calls after last DeepWiki
+
+--- Enhanced Metrics ---
+  Tool Diversity:    33%
+  Search Depth:      3 repos examined
+  Token Efficiency:  10,755 tokens/solution
+  Duration:          2:45
+
+--- Run Summary ---
+  Run 1: score 0.75, 3 solutions
+  Run 2: score 0.75, 3 solutions
+  Run 3: score 0.55, 3 solutions, 1 violation
+
+--- Baseline Comparison ---
+  Workflow Score     0.68 (baseline: 0.75) -0.07 ↓
+  Tokens             32846 (baseline: 27047) +5799 ↑
+  Solutions          5 (baseline: 5) =
+  Search Success     1.00 (baseline: 1.00) =
+```
+
+#### Workflow Violations
+
+Violations detect workflow quality issues and scale based on severity:
+
+| Rule                           | Base Impact | Max Impact | Trigger                                         |
+| ------------------------------ | ----------- | ---------- | ----------------------------------------------- |
+| `no_webfetch_on_github`          | -0.20       | -0.20      | Used webfetch on github.com instead of DeepWiki |
+| `must_use_deepwiki`              | -0.25       | -0.25      | Skill loaded but DeepWiki not used              |
+| `explicit_skill_required`        | -0.30       | -0.30      | Skill failed to load in explicit mode           |
+| `stuck_on_google_search`         | -0.15       | -0.15      | Multiple google_search calls without skill      |
+| `delayed_deepwiki_start`         | -0.10       | -0.25      | > 2 non-read steps before first DeepWiki call   |
+| `insufficient_deepwiki_usage`    | -0.10       | -0.20      | < 2 DeepWiki calls when skill loaded            |
+| `excessive_post_deepwiki_search` | -0.08       | -0.20      | > 3 search tools after last DeepWiki call       |
+
+#### Pass Criteria
+
+| Criterion              | Requirement                    |
+| ---------------------- | ------------------------------ |
+| Skill loaded           | `true`                         |
+| Workflow score         | ≥ 0.70 (configurable baseline) |
+| No critical regression | Token spike, score drop, solutions loss |
+
+#### Baselines
+
+Baselines are stored in `tests/e2e/baseline/{explicit,implicit}.json`:
+
+```bash
+# Create initial baseline
+bun test:e2e --runs 3 --set-baseline
+
+# Update baseline after improvements
+bun test:e2e --mode implicit --set-baseline
+
+# Set baseline from existing results
+bun test:e2e --set-baseline tests/e2e/results/implicit-260309-060729
+```
+
+#### Results Location
+
+Results are saved to `tests/e2e/results/{mode}-{YYMMDD-HHmmss}/`:
+
+```
+tests/e2e/results/implicit-260309-060729/
+├── consistency-report.json    # Full report with all metrics
+├── token-metrics.json         # Token usage breakdown
+├── run-1-1773051087396/       # Per-run details
+│   └── run-metrics.json
+├── run-2-1773051436343/
+│   └── run-metrics.json
+└── run-3-1773051633361/
+    └── run-metrics.json
+```
+
+#### Viewing Results
+
+Use `--show-results` to quickly view results without re-running tests:
+
+```bash
+# Show latest results (auto-detects most recent directory, any mode)
+bun test:e2e --show-results
+
+# Show latest results filtered by mode
+bun test:e2e -s --mode implicit
+
+# Show latest explicit results
+bun test:e2e --show-results --mode explicit
+
+# Show latest with detailed output
+bun test:e2e -s --verbose
+
+# Show specific results directory
+bun test:e2e --show-results tests/e2e/results/implicit-260309-060729
+
+# Short form with mode filter and verbose
+bun test:e2e -s --mode implicit -v
+```
 
 ### Local Testing
 
