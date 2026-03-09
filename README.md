@@ -94,7 +94,14 @@ Then add to your project's `opencode.json`:
 
 ## Usage
 
-Once installed, agents automatically use IntelliSearch for technical queries. Or trigger manually with `/search-intelligently`:
+**Two ways to search:**
+
+1. **Agent-First (Recommended)** — Just ask your agent naturally. The skill auto-loads when research is needed.
+2. **Manual Command** — Use `/search-intelligently` for explicit control.
+
+### Agent-Powered Research (Automatic)
+
+Once installed, agents automatically use IntelliSearch for technical queries:
 
 ### Agent-Powered Research
 
@@ -128,6 +135,21 @@ Once installed, agents automatically use IntelliSearch for technical queries. Or
 2. **Smart Search** — Selects best tool, finds repos, filters by relevance
 3. **Deep Analysis** — Queries DeepWiki for authoritative answers
 4. **Synthesis** — Returns comprehensive answer with code examples
+
+### Command vs Skill: What's the Difference?
+
+**`/search-intelligently` Command** (Human-controlled)
+- Explicit manual trigger
+- Direct control over search parameters
+- Use when you want precise control
+
+**IntelliSearch Skill** (Agent-controlled)
+- Auto-loads when agent needs research capabilities
+- Triggers on natural language queries
+- Agent decides when to search autonomously
+- Preferred for most workflows
+
+**TL;DR:** Just talk to your agent normally. The skill handles the rest.
 
 ## Requirements
 
