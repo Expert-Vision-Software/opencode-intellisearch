@@ -9,6 +9,7 @@ export interface EventMonitor {
   tokens: { input: number; output: number };
   toolsUsed: Set<string>;
   printedTools: Set<string>;
+  bashCommands: string[];
   abort: () => void;
   waitForCompletion: () => Promise<void>;
 }
@@ -66,6 +67,7 @@ export async function createEventMonitor(
     tokens: { input: 0, output: 0 },
     toolsUsed: new Set(),
     printedTools: new Set(),
+    bashCommands: [],
     abort: () => abortController.abort(),
     waitForCompletion: () => {
       const timeoutMs = 600000;
@@ -131,6 +133,14 @@ export async function createEventMonitor(
             
             clearStatusLine();
             const cumulativeTokens = state.tokens.input + state.tokens.output;
+            
+            if (toolName === "bash") {
+              const cmd = String(input.command || "");
+              if (cmd) {
+                state.bashCommands.push(cmd);
+              }
+            }
+            
             if (!state.printedTools.has(toolKey)) {
               state.printedTools.add(toolKey);
               printToolUse(part.tool, input, Date.now(), cumulativeTokens);
@@ -203,7 +213,8 @@ export function calculateWorkflowCompliance(
 ): WorkflowCompliance {
   const usedGhCli = text.includes("gh search") || text.includes("gh repo");
   const usedDeepWiki = monitor.toolsUsed.has("deepwiki_ask_question") ||
-                       monitor.toolsUsed.has("deepwiki_read_wiki_structure");
+                       monitor.toolsUsed.has("deepwiki_read_wiki_structure") ||
+                       monitor.bashCommands.some(cmd => cmd.includes("mcp.deepwiki.com"));
   const usedWebfetch = monitor.toolsUsed.has("webfetch");
   const usedWebfetchOnGithub = usedWebfetch && text.includes("github.com");
   
