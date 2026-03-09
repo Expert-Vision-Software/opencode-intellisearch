@@ -11,6 +11,22 @@ const SEARCH_TOOLS = new Set([
   "google_search",
 ]);
 
+const DEEPWIKI_TOOLS = new Set([
+  "deepwiki_ask_question",
+  "deepwiki_read_wiki_structure",
+  "deepwiki_read_wiki_contents",
+]);
+
+const EXCLUDED_FROM_STEP_COUNT = new Set(["read", "skill", "task"]);
+
+export interface ToolCallRecord {
+  position: number;
+  tool: string;
+  isDeepWiki: boolean;
+  isSearchTool: boolean;
+  isRead: boolean;
+}
+
 export interface EventMonitor {
   toolCallCount: number;
   skillDetected: boolean;
@@ -22,6 +38,7 @@ export interface EventMonitor {
   reposExamined: Set<string>;
   deepWikiQuestions: number;
   startTime: number;
+  toolCallSequence: ToolCallRecord[];
   abort: () => void;
   waitForCompletion: () => Promise<void>;
 }
@@ -83,6 +100,7 @@ export async function createEventMonitor(
     reposExamined: new Set(),
     deepWikiQuestions: 0,
     startTime: Date.now(),
+    toolCallSequence: [],
     abort: () => abortController.abort(),
     waitForCompletion: () => {
       const timeoutMs = 600000;
@@ -125,6 +143,18 @@ export async function createEventMonitor(
             state.toolCallCount++;
             const toolName = part.tool.toLowerCase();
             state.toolsUsed.add(toolName);
+            
+            const isDeepWiki = DEEPWIKI_TOOLS.has(toolName);
+            const isSearchTool = SEARCH_TOOLS.has(toolName);
+            const isRead = toolName === "read";
+            
+            state.toolCallSequence.push({
+              position: state.toolCallCount,
+              tool: toolName,
+              isDeepWiki,
+              isSearchTool,
+              isRead,
+            });
             
             const input = part.state.input;
             const toolKey = `${toolName}:${JSON.stringify(input)}`;
@@ -289,6 +319,56 @@ export function calculateWorkflowCompliance(
       detail: "Multiple google_search calls without skill loading",
       impact: -0.15,
     });
+  }
+  
+  const deepWikiCalls = monitor.toolCallSequence.filter(c => c.isDeepWiki);
+  const firstDeepWikiCall = deepWikiCalls[0];
+  const lastDeepWikiCall = deepWikiCalls[deepWikiCalls.length - 1];
+  
+  if (firstDeepWikiCall && monitor.skillDetected) {
+    const nonReadStepsBeforeDeepWiki = monitor.toolCallSequence
+      .filter(c => c.position < firstDeepWikiCall.position && !EXCLUDED_FROM_STEP_COUNT.has(c.tool))
+      .length;
+    
+    if (nonReadStepsBeforeDeepWiki > 2) {
+      const excessSteps = nonReadStepsBeforeDeepWiki - 2;
+      const scaledImpact = Math.min(0.25, 0.10 + (excessSteps * 0.03));
+      violations.push({
+        rule: "delayed_deepwiki_start",
+        detail: `${nonReadStepsBeforeDeepWiki} non-read steps before first DeepWiki call`,
+        impact: -Math.round(scaledImpact * 100) / 100,
+      });
+    }
+    
+    const totalDeepWikiCalls = deepWikiCalls.length;
+    if (totalDeepWikiCalls < 2) {
+      const deficit = 2 - totalDeepWikiCalls;
+      const scaledImpact = Math.min(0.20, 0.10 + (deficit * 0.05));
+      violations.push({
+        rule: "insufficient_deepwiki_usage",
+        detail: `Only ${totalDeepWikiCalls} DeepWiki call(s)`,
+        impact: -Math.round(scaledImpact * 100) / 100,
+      });
+    }
+    
+    if (lastDeepWikiCall) {
+      const searchToolsAfterDeepWiki = monitor.toolCallSequence
+        .filter(c => 
+          c.position > lastDeepWikiCall.position && 
+          c.isSearchTool && 
+          !c.isDeepWiki
+        ).length;
+      
+      if (searchToolsAfterDeepWiki > 3) {
+        const excessSearches = searchToolsAfterDeepWiki - 3;
+        const scaledImpact = Math.min(0.20, 0.08 + (excessSearches * 0.02));
+        violations.push({
+          rule: "excessive_post_deepwiki_search",
+          detail: `${searchToolsAfterDeepWiki} search tool calls after last DeepWiki`,
+          impact: -Math.round(scaledImpact * 100) / 100,
+        });
+      }
+    }
   }
   
   const usedSearchTools = [...monitor.toolsUsed].filter(t => SEARCH_TOOLS.has(t));

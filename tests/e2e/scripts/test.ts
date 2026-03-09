@@ -15,6 +15,7 @@ interface CliArgs {
   baselinePath: string | null;
   analyze: string | null;
   validate: boolean;
+  verbose: boolean;
   help: boolean;
 }
 
@@ -27,6 +28,7 @@ function parseArgs(args: string[]): CliArgs {
     baselinePath: null,
     analyze: null,
     validate: false,
+    verbose: false,
     help: false
   };
   
@@ -35,8 +37,10 @@ function parseArgs(args: string[]): CliArgs {
     
     if (arg === "--help" || arg === "-h") {
       result.help = true;
-    } else if (arg === "--validate" || arg === "-v") {
+    } else if (arg === "--validate") {
       result.validate = true;
+    } else if (arg === "--verbose") {
+      result.verbose = true;
     } else if (arg === "--mode" || arg === "-m") {
       const value = args[++i];
       if (value === "explicit" || value === "implicit" || value === "both") {
@@ -76,7 +80,8 @@ Options:
   -m, --mode <mode>        Test mode: explicit, implicit, or both (default: explicit)
   -r, --runs <n>           Number of test runs (default: 1)
   --model <model>          Model to use (default: pre-configured)
-  -v, --validate           Run validation test (quick check)
+  --validate               Run validation test (quick check)
+  --verbose                Show detailed output with breakdown, violations, baseline comparison
   -b, --set-baseline       Save results as new baseline
                            Optionally provide path to existing results dir
   -a, --analyze <dir>      Re-analyze existing results
@@ -88,6 +93,7 @@ Examples:
   bun test:e2e --mode implicit                  # Test implicit mode
   bun test:e2e --mode both                      # Test both modes
   bun test:e2e --runs 3                         # Multiple runs
+  bun test:e2e --verbose                        # Detailed output
   bun test:e2e --set-baseline                   # Save current as baseline
   bun test:e2e --set-baseline results/explicit-260306-143205
   bun test:e2e --analyze results/explicit-260306-143205
@@ -106,7 +112,8 @@ async function dirExists(path: string): Promise<boolean> {
 async function runSingleMode(
   mode: SkillMode, 
   config: TestConfig, 
-  setBaseline: boolean
+  setBaseline: boolean,
+  verbose: boolean = false
 ): Promise<{ passed: boolean; resultsDir: string }> {
   const testConfig: TestConfig = { ...config, mode };
   
@@ -127,13 +134,13 @@ async function runSingleMode(
   const baseline = await loadBaseline(config.projectDir, mode);
   const result = evaluateResult(metrics, baseline);
   
-  printResult(result);
+  printResult(result, verbose);
   printResultsPath(resultsDir);
   
   return { passed: result.passed, resultsDir };
 }
 
-async function analyzeResults(resultsPath: string, projectDir: string): Promise<boolean> {
+async function analyzeResults(resultsPath: string, projectDir: string, verbose: boolean = false): Promise<boolean> {
   const resolvedPath = resolve(projectDir, resultsPath);
   
   if (!(await dirExists(resolvedPath))) {
@@ -157,7 +164,7 @@ async function analyzeResults(resultsPath: string, projectDir: string): Promise<
   const baseline = await loadBaseline(projectDir, mode);
   const result = evaluateResult(metrics, baseline);
   
-  printResult(result);
+  printResult(result, verbose);
   
   return result.passed;
 }
@@ -271,7 +278,7 @@ async function main(): Promise<void> {
   
   try {
     if (args.analyze) {
-      const passed = await analyzeResults(args.analyze, projectDir);
+      const passed = await analyzeResults(args.analyze, projectDir, args.verbose);
       process.exit(passed ? 0 : 1);
       return;
     }
@@ -285,15 +292,15 @@ async function main(): Promise<void> {
     let allPassed = true;
     
     if (args.mode === "both") {
-      const explicitResult = await runSingleMode("explicit", config, args.setBaseline);
+      const explicitResult = await runSingleMode("explicit", config, args.setBaseline, args.verbose);
       allPassed = explicitResult.passed && allPassed;
       
       console.log("");
       
-      const implicitResult = await runSingleMode("implicit", config, args.setBaseline);
+      const implicitResult = await runSingleMode("implicit", config, args.setBaseline, args.verbose);
       allPassed = implicitResult.passed && allPassed;
     } else {
-      const result = await runSingleMode(args.mode, config, args.setBaseline);
+      const result = await runSingleMode(args.mode, config, args.setBaseline, args.verbose);
       allPassed = result.passed;
     }
     
