@@ -1,6 +1,6 @@
 ---
 name: intellisearch
-description: Use this skill when the user asks to find, search for, or discover JavaScript/TypeScript libraries, frameworks, packages, or GitHub repositories. Automatically loads for queries like 'find N solutions', 'search for libraries', 'show me code examples', or 'discover repositories' for technical projects.
+description: Use this skill when finding, searching for, comparing, or discovering libraries, frameworks, packages, or GitHub repositories. Automatically loads for queries like 'find N solutions', 'how to X with library Y', 'search for libraries', 'show me code examples', or 'discover repositories' for technical projects.
 license: MIT
 compatibility: opencode
 metadata:
@@ -29,7 +29,7 @@ Instructions:
 
 ## Activation Triggers
 
-**USE this skill when user asks about:**
+**USE this skill when asking about:**
 
 <use_cases>
 <case category="libraries">"Is there a TypeScript library for semver validation?"</case>
@@ -72,9 +72,9 @@ Instructions:
 ## References
 
 **Read immediately:**
-- @references/examples.md - Few-shot examples (library discovery, comparison, fallback)
 - @references/workflow.md - Pipeline phases, decision matrix, failure handling
 - @references/search-workflow.md - Tool detection, URI cycling
+- @references/examples.md - Few-shot examples (library discovery, comparison, fallback)
 
 **Load on-demand:**
 - @references/gh-cli.md - GitHub CLI search syntax
