@@ -8,6 +8,7 @@ export interface EventMonitor {
   skillLoadMethod: "explicit" | "implicit" | "none";
   tokens: { input: number; output: number };
   toolsUsed: Set<string>;
+  printedTools: Set<string>;
   abort: () => void;
   waitForCompletion: () => Promise<void>;
 }
@@ -64,6 +65,7 @@ export async function createEventMonitor(
     skillLoadMethod: "none",
     tokens: { input: 0, output: 0 },
     toolsUsed: new Set(),
+    printedTools: new Set(),
     abort: () => abortController.abort(),
     waitForCompletion: () => {
       const timeoutMs = 600000;
@@ -104,11 +106,13 @@ export async function createEventMonitor(
           
           if (isRunningToolPart(part)) {
             state.toolCallCount++;
-            state.toolsUsed.add(part.tool);
+            const toolName = part.tool.toLowerCase();
+            state.toolsUsed.add(toolName);
             
             const input = part.state.input;
+            const toolKey = `${toolName}:${JSON.stringify(input)}`;
             
-            if (part.tool === "skill" || part.tool === "task") {
+            if (toolName === "skill" || toolName === "task") {
               const name = input.name as string | undefined;
               const command = input.command as string | undefined;
               const prompt = input.prompt as string | undefined;
@@ -127,7 +131,10 @@ export async function createEventMonitor(
             
             clearStatusLine();
             const cumulativeTokens = state.tokens.input + state.tokens.output;
-            printToolUse(part.tool, input, Date.now(), cumulativeTokens);
+            if (!state.printedTools.has(toolKey)) {
+              state.printedTools.add(toolKey);
+              printToolUse(part.tool, input, Date.now(), cumulativeTokens);
+            }
             
             if (config.mode === "explicit" && 
                 state.toolCallCount >= MAX_TOOL_CALLS_WITHOUT_SKILL && 
@@ -195,8 +202,8 @@ export function calculateWorkflowCompliance(
   text: string
 ): WorkflowCompliance {
   const usedGhCli = text.includes("gh search") || text.includes("gh repo");
-  const usedDeepWiki = monitor.toolsUsed.has("DeepWiki_ask_question") ||
-                       monitor.toolsUsed.has("DeepWiki_read_wiki_structure");
+  const usedDeepWiki = monitor.toolsUsed.has("deepwiki_ask_question") ||
+                       monitor.toolsUsed.has("deepwiki_read_wiki_structure");
   const usedWebfetch = monitor.toolsUsed.has("webfetch");
   const usedWebfetchOnGithub = usedWebfetch && text.includes("github.com");
   

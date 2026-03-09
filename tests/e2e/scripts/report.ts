@@ -30,9 +30,10 @@ function formatTimestamp(ts: number | undefined): string {
 export function printToolUse(tool: string, input: Record<string, unknown>, timestamp?: number, cumulativeTokens?: number): void {
   const time = formatTimestamp(timestamp);
   const tokens = cumulativeTokens !== undefined ? ` [${cumulativeTokens.toLocaleString()}]` : "";
+  const toolLower = tool.toLowerCase();
   let detail = "";
   
-  switch (tool) {
+  switch (toolLower) {
     case "skill":
       detail = String(input.name || "");
       break;
@@ -42,11 +43,11 @@ export function printToolUse(tool: string, input: Record<string, unknown>, times
       detail = ghMatch ? `gh search "${ghMatch[1]}"` : "gh command";
       break;
     }
-    case "DeepWiki_ask_question":
+    case "deepwiki_ask_question":
       detail = String(input.repoName || input.question || "");
       break;
-    case "DeepWiki_read_wiki_structure":
-    case "DeepWiki_read_wiki_contents":
+    case "deepwiki_read_wiki_structure":
+    case "deepwiki_read_wiki_contents":
       detail = String(input.repoName || "");
       break;
     case "webfetch": {
