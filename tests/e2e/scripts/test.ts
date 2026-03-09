@@ -1,5 +1,5 @@
 import { resolve, basename, join } from "node:path";
-import { stat } from "node:fs/promises";
+import { stat, readdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import type { SkillMode, TestConfig } from "./types.ts";
@@ -14,6 +14,7 @@ interface CliArgs {
   setBaseline: boolean;
   baselinePath: string | null;
   analyze: string | null;
+  showResults: string | null;
   validate: boolean;
   verbose: boolean;
   help: boolean;
@@ -27,6 +28,7 @@ function parseArgs(args: string[]): CliArgs {
     setBaseline: false,
     baselinePath: null,
     analyze: null,
+    showResults: null,
     validate: false,
     verbose: false,
     help: false
@@ -64,6 +66,14 @@ function parseArgs(args: string[]): CliArgs {
       }
     } else if (arg === "--analyze" || arg === "-a") {
       result.analyze = args[++i] ?? null;
+    } else if (arg === "--show-results" || arg === "-s") {
+      const next = args[i + 1];
+      if (next && !next.startsWith("-")) {
+        result.showResults = next;
+        i++;
+      } else {
+        result.showResults = "latest";
+      }
     }
   }
   
@@ -85,6 +95,9 @@ Options:
   -b, --set-baseline       Save results as new baseline
                            Optionally provide path to existing results dir
   -a, --analyze <dir>      Re-analyze existing results
+  -s, --show-results       Show results from latest run or specified directory
+                           Without arg: shows latest results
+                           With dir: shows results from that directory
   -h, --help               Show this help
 
 Examples:
@@ -95,8 +108,11 @@ Examples:
   bun test:e2e --runs 3                         # Multiple runs
   bun test:e2e --verbose                        # Detailed output
   bun test:e2e --set-baseline                   # Save current as baseline
-  bun test:e2e --set-baseline results/explicit-260306-143205
-  bun test:e2e --analyze results/explicit-260306-143205
+  bun test:e2e --set-baseline tests/e2e/results/explicit-260306-143205
+  bun test:e2e --analyze tests/e2e/results/explicit-260306-143205
+  bun test:e2e --show-results                   # Show latest results
+  bun test:e2e --show-results --verbose         # Show latest with details
+  bun test:e2e -s tests/e2e/results/implicit-260309-060729
 `);
 }
 
@@ -107,6 +123,63 @@ async function dirExists(path: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+async function findLatestResultsDir(projectDir: string): Promise<string | null> {
+  const resultsDir = join(projectDir, "tests/e2e/results");
+  
+  if (!(await dirExists(resultsDir))) {
+    return null;
+  }
+  
+  const entries = await readdir(resultsDir, { withFileTypes: true });
+  const dirs = entries
+    .filter(e => e.isDirectory() && (e.name.startsWith("explicit-") || e.name.startsWith("implicit-")))
+    .map(e => e.name)
+    .sort()
+    .reverse();
+  
+  return dirs.length > 0 ? join(resultsDir, dirs[0]) : null;
+}
+
+async function showResults(resultsPath: string | null, projectDir: string, verbose: boolean = false): Promise<boolean> {
+  let resolvedPath: string;
+  
+  if (resultsPath === "latest" || resultsPath === null) {
+    const latestDir = await findLatestResultsDir(projectDir);
+    if (!latestDir) {
+      printError("No results directories found in tests/e2e/results/");
+      return false;
+    }
+    resolvedPath = latestDir;
+    console.log(`Showing latest results: ${basename(resolvedPath)}\n`);
+  } else {
+    resolvedPath = resolve(projectDir, resultsPath);
+    
+    if (!(await dirExists(resolvedPath))) {
+      printError(`Results directory not found: ${resolvedPath}`);
+      return false;
+    }
+    console.log(`Showing results from: ${basename(resolvedPath)}\n`);
+  }
+  
+  const dirName = basename(resolvedPath);
+  const modeMatch = dirName.match(/^(explicit|implicit)-/);
+  const mode: SkillMode = modeMatch ? (modeMatch[1] as SkillMode) : "explicit";
+  
+  const metrics = await loadResultsDir(resolvedPath);
+  
+  if (!metrics) {
+    printError("Failed to load results");
+    return false;
+  }
+  
+  const baseline = await loadBaseline(projectDir, mode);
+  const result = evaluateResult(metrics, baseline);
+  
+  printResult(result, verbose);
+  
+  return result.passed;
 }
 
 async function runSingleMode(
@@ -267,6 +340,12 @@ async function main(): Promise<void> {
   
   if (args.validate) {
     const passed = await runValidation(projectDir);
+    process.exit(passed ? 0 : 1);
+    return;
+  }
+  
+  if (args.showResults !== null) {
+    const passed = await showResults(args.showResults, projectDir, args.verbose);
     process.exit(passed ? 0 : 1);
     return;
   }

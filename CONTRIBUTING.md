@@ -124,6 +124,7 @@ bun test:e2e --mode both --runs 3
 | `--verbose`              | Show detailed output with breakdown and violations   |
 | `-b, --set-baseline`     | Save current results as baseline                     |
 | `-a, --analyze <dir>`    | Re-analyze existing results directory                |
+| `-s, --show-results`     | Show results from latest or specified directory      |
 | `-h, --help`             | Show help                                            |
 
 #### Examples
@@ -146,6 +147,15 @@ bun test:e2e --set-baseline tests/e2e/results/implicit-260309-060729
 
 # Re-analyze previous run
 bun test:e2e --analyze tests/e2e/results/explicit-260309-055419 --verbose
+
+# Show results from latest run
+bun test:e2e --show-results
+
+# Show latest results with verbose output
+bun test:e2e -s --verbose
+
+# Show results from specific directory
+bun test:e2e --show-results tests/e2e/results/implicit-260309-060729
 ```
 
 #### Output Formats
@@ -266,6 +276,24 @@ tests/e2e/results/implicit-260309-060729/
 │   └── run-metrics.json
 └── run-3-1773051633361/
     └── run-metrics.json
+```
+
+#### Viewing Results
+
+Use `--show-results` to quickly view results without re-running tests:
+
+```bash
+# Show latest results (auto-detects most recent directory)
+bun test:e2e --show-results
+
+# Show latest with detailed output
+bun test:e2e -s --verbose
+
+# Show specific results directory
+bun test:e2e --show-results tests/e2e/results/implicit-260309-060729
+
+# Short form
+bun test:e2e -s tests/e2e/results/explicit-260309-055419 -v
 ```
 
 ### Local Testing
