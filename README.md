@@ -1,30 +1,65 @@
-# IntelliSearch
+# IntelliSearch — AI Agent GitHub Search & Research Intelligence
 
-**Give your AI agent GitHub superpowers.**
+[![OpenCode Plugin](https://img.shields.io/badge/OpenCode-Plugin-blue)](https://opencode.ai)
+[![npm version](https://img.shields.io/npm/v/opencode-intellisearch)](https://www.npmjs.com/package/opencode-intellisearch)
+[![MIT License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
-IntelliSearch is an OpenCode plugin that equips autonomous agents with intelligent repository search and DeepWiki-powered answers—eliminating manual web searches and enabling smarter, faster technical research.
+**Give your AI agent GitHub superpowers.** IntelliSearch is an OpenCode plugin that equips autonomous agents with intelligent repository search and DeepWiki-powered answers—eliminating manual web searches and enabling smarter, faster technical research.
 
-## Why IntelliSearch?
+---
 
-**The Problem:** AI agents waste tokens and time on generic web searches, returning shallow answers that require follow-up queries and human intervention.
+[Quick Start](#quick-start) · [Features](#features) · [Use Cases](#use-cases) · [How It Works](#how-it-works) · [Requirements](#requirements) · [Documentation](#documentation)
 
-**The Solution:** IntelliSearch gives agents direct access to GitHub's knowledge base, delivering authoritative answers from real codebases in a single query.
+---
+
+## What is IntelliSearch?
+
+IntelliSearch is an **AI agent search intelligence** plugin that transforms how autonomous agents research code. Instead of generic web searches that return shallow results, agents get direct access to GitHub's knowledge base with authoritative answers from real codebases.
+
+### Search Intelligence for AI Agents
+
+- **Autonomous Research** — Agents search, discover, and synthesize without human hand-holding
+- **Deep Search** — Query across 6+ repositories in a single search with code-level answers
+- **Agent Web Search Alternative** — Replace manual browser research with intelligent automation
+- **100% Search Success** — Reliable results across all tool availability scenarios
+
+### Keywords
+
+`search intelligence` `agent intelligence` `deep search` `research automation` `agent web search` `AI research` `GitHub search` `code discovery` `library comparison` `technical research`
+
+---
+
+## Quick Start
+
+```bash
+# One-line install
+bunx opencode-intellisearch install
+
+# Or non-interactive
+bunx opencode-intellisearch install --scope local
+bunx opencode-intellisearch install --scope global
+```
+
+That's it! The installer handles configuration automatically. Start researching:
+
+```bash
+/search-intelligently How does React useEffect cleanup work?
+/search-intelligently Best TypeScript validation libraries
+/search-intelligently Next.js vs Remix for SSR
+```
+
+---
+
+## Features
 
 ### What Your Agent Gets
 
 - **Autonomous Intelligence** — Agents search, discover, and synthesize without human hand-holding
 - **Real Code, Real Answers** — DeepWiki extracts implementation knowledge from actual repositories
-- **One Query, Multiple Repos** — Compare solutions across 6+ repos in a single search (E2E tested)
+- **Multi-Repo Deep Search** — Compare solutions across 6+ repos in a single search
 - **100% Search Success Rate** — Tested reliability across different tool availability scenarios
 - **Smart Tool Selection** — Auto-detects and uses gh CLI, web search, or fetch for maximum compatibility
 - **Zero Manual Research** — Replace browser tabs with autonomous agent-driven discovery
-
-### Perfect For
-
-- **Autonomous Agents** — Let agents research and compare libraries without supervision
-- **Tech Research** — Find the right library, framework, or pattern in seconds
-- **Code Discovery** — Get implementation examples from production codebases
-- **Library Comparison** — "Zod vs Yup" → instant comparison with code samples
 
 ### Proven Performance
 
@@ -35,151 +70,61 @@ Based on E2E testing with real queries:
 - **6-7 Solutions Per Query** — Comprehensive discovery across multiple repositories
 - **~31K Avg Tokens** — Efficient token usage for complex multi-repo queries
 
-## Quick Start
+---
 
-**Power up your agent in 30 seconds:**
+## Use Cases
 
-**One-line install:**
+### Perfect For
 
-```bash
-bun add -g opencode-intellisearch
-```
+- **Autonomous Agents** — Let agents research and compare libraries without supervision
+- **Tech Research** — Find the right library, framework, or pattern in seconds
+- **Code Discovery** — Get implementation examples from production codebases
+- **Library Comparison** — "Zod vs Yup" → instant comparison with code samples
 
-Add to `~/.config/opencode/opencode.json`:
-
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "plugins": ["opencode-intellisearch"],
-  "mcpServers": {
-    "deepwiki": {
-      "url": "https://mcp.deepwiki.com/mcp"
-    }
-  }
-}
-```
-
-**Done.** Start searching:
-
-```bash
-/search-intelligently How does React useEffect cleanup work?
-/search-intelligently Best TypeScript validation libraries
-/search-intelligently Next.js vs Remix for SSR
-```
-
-## Installation
-
-Add to your `opencode.json`:
-
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "plugins": ["opencode-intellisearch"]
-}
-```
-
-Or install locally in your project:
-
-```bash
-bun add -d opencode-intellisearch
-```
-
-Then add to your project's `opencode.json`:
-
-```json
-{
-  "plugins": ["opencode-intellisearch"]
-}
-```
-
-## Usage
-
-**Two ways to search:**
-
-1. **Agent-First (Recommended)** — Just ask your agent naturally. The skill auto-loads when research is needed.
-2. **Manual Command** — Use `/search-intelligently` for explicit control.
-
-### Agent-Powered Research (Automatic)
-
-Once installed, agents automatically use IntelliSearch for technical queries:
-
-### Agent-Powered Research
+### Example Queries
 
 **Library Discovery:**
-```bash
+```
 "Find me a TypeScript library for semver validation"
-# Agent searches GitHub → queries DeepWiki → returns top 3 options with examples
+→ Agent searches GitHub → queries DeepWiki → returns top 3 options with examples
 ```
 
 **Framework Comparisons:**
-```bash
+```
 "Compare Zod vs Yup for validation libraries"
-# Agent analyzes both repos → synthesizes trade-offs → gives implementation guidance
+→ Agent analyzes both repos → synthesizes trade-offs → gives implementation guidance
 ```
 
 **Implementation Patterns:**
-```bash
+```
 "What's the best way to handle file uploads in Next.js?"
-# Agent searches repos → extracts patterns from real code → delivers answer
+→ Agent searches repos → extracts patterns from real code → delivers answer
 ```
 
 **Direct Repo Queries:**
-```bash
+```
 /search-intelligently github:vercel/next.js app router patterns
 /search-intelligently github:prisma/prisma composite keys support
 ```
 
-### How Agents Use It
+---
 
-1. **Autonomous Activation** — Agent detects research query → loads skill automatically
-2. **Smart Search** — Selects best tool, finds repos, filters by relevance
-3. **Deep Analysis** — Queries DeepWiki for authoritative answers
-4. **Synthesis** — Returns comprehensive answer with code examples
+## Two Ways to Search
 
-### Command vs Skill: What's the Difference?
+1. **Agent-First (Recommended)** — Just ask your agent naturally. The skill auto-loads when research is needed.
+2. **Manual Command** — Use `/search-intelligently` for explicit control.
 
-**`/search-intelligently` Command** (Human-controlled)
-- Explicit manual trigger
-- Direct control over search parameters
-- Use when you want precise control
+### Command vs Skill
 
-**IntelliSearch Skill** (Agent-controlled)
-- Auto-loads when agent needs research capabilities
-- Triggers on natural language queries
-- Agent decides when to search autonomously
-- Preferred for most workflows
+| Feature | Command | IntelliSearch Skill |
+|---------|--------------------------------|---------------------|
+| Trigger | Explicit manual | Automatic on research queries |
+| Control | Direct | Agent decides |
+| Use case | Precise control | Most workflows |
 
 **TL;DR:** Just talk to your agent normally. The skill handles the rest.
 
-## Requirements
-
-### Runtime
-
-- **Bun** - Download from [bun.sh](https://bun.sh/)
-
-### Optional
-
-- **GitHub CLI (`gh`)** - Direct GitHub repository search (preferred when available)
-  - Install from [cli.github.com](https://cli.github.com/)
-  - Run `gh auth login` to authenticate
-
-### MCP Servers
-
-**Required:**
-- **deepwiki** - Repository Q&A ([docs](https://docs.devin.ai/work-with-devin/deepwiki-mcp))
-
-Configure in `~/.config/opencode/opencode.json` or project `opencode.json`:
-
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "mcpServers": {
-    "deepwiki": {
-      "url": "https://mcp.deepwiki.com/mcp"
-    }
-  }
-}
-```
+---
 
 ## How It Works
 
@@ -191,7 +136,7 @@ IntelliSearch gives your agent a three-tier search brain that adapts to availabl
 2. **Web Search** — Falls back to `site:github.com` search if gh CLI unavailable  
 3. **Fetch Tool** — URI-based search cycling through Brave → DuckDuckGo → Google
 
-### Agent-First Design
+### Agent Workflow
 
 When you ask your agent to research something, IntelliSearch:
 
@@ -223,11 +168,45 @@ flowchart TD
     style H fill:#f8d7da
 ```
 
+---
+
+## Requirements
+
+### Runtime
+
+- **Bun** - Download from [bun.sh](https://bun.sh/)
+
+### Optional
+
+- **GitHub CLI (`gh`)** - Direct GitHub repository search (preferred when available)
+  - Install from [cli.github.com](https://cli.github.com/)
+  - Run `gh auth login` to authenticate
+
+### MCP Servers
+
+- **deepwiki** - Repository Q&A ([docs](https://docs.devin.ai/work-with-devin/deepwiki-mcp))
+
+The installer automatically configures the deepwiki MCP server. For manual setup:
+
+```json
+{
+  "mcpServers": {
+    "deepwiki": {
+      "url": "https://mcp.deepwiki.com/mcp"
+    }
+  }
+}
+```
+
+---
+
 ## Documentation
 
-- [Installation](INSTALLATION.md)
-- [Contributing](CONTRIBUTING.md)
-- [Changelog](CHANGELOG.md)
+- [Installation Guide](INSTALLATION.md) — Full installation options and troubleshooting
+- [Contributing](CONTRIBUTING.md) — Development setup and testing
+- [Changelog](CHANGELOG.md) — Version history
+
+---
 
 ## Troubleshooting
 
@@ -241,6 +220,8 @@ flowchart TD
 - Check OpenCode logs: `~/.local/share/opencode/log/`
 - Verify plugin is in `opencode.json` plugins array
 - Ensure Bun is installed and in PATH
+
+---
 
 ## Development
 
@@ -256,16 +237,15 @@ bun test
 
 # Run E2E tests
 bun test:e2e
-
-# Link for local testing
-bun link && bun link opencode-intellisearch --cwd ~/.cache/opencode/node_modules/
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed development instructions.
+---
 
 ## License
 
 MIT License - see [LICENSE](LICENSE)
+
+---
 
 ## Acknowledgments
 
