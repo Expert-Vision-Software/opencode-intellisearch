@@ -30,32 +30,57 @@ Detailed installation instructions for intellisearch extension for OpenCode.
 
 ## Installation
 
-### Option 1: npm/bun Package (Recommended)
+### Option 1: CLI (Recommended)
 
-Add to your `opencode.json`:
+The easiest way—runs the installer which handles everything:
+
+```bash
+# Interactive installer (asks for preferences)
+bunx opencode-intellisearch install
+
+# Non-interactive, global (all projects)
+bunx opencode-intellisearch install --scope global
+
+# Non-interactive, local (current project only)
+bunx opencode-intellisearch install --scope local
+
+# Skip confirmation prompts
+bunx opencode-intellisearch install --scope global --force
+```
+
+The installer will:
+- Copy skill and command files to `.opencode/`
+- Configure skill permission (`permission.skill.intellisearch: "allow"`)
+- Add MCP server configuration (deepwiki)
+- Add plugin to opencode.json
+
+### Option 2: npm/bun Package
+
+Install globally or locally, then configure manually:
+
+```bash
+# Global install
+bun add -g opencode-intellisearch
+
+# Local install (project only)
+bun add -d opencode-intellisearch
+```
+
+Then add to your `opencode.json`:
 
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["opencode-intellisearch"]
+  "plugins": ["opencode-intellisearch"],
+  "mcpServers": {
+    "deepwiki": {
+      "url": "https://mcp.deepwiki.com/mcp"
+    }
+  }
 }
 ```
 
-Or install locally in your project:
-
-```bash
-bun add -d opencode-intellisearch
-```
-
-Then add to your project's `opencode.json`:
-
-```json
-{
-  "plugins": ["opencode-intellisearch"]
-}
-```
-
-### Option 2: Local Development
+### Option 3: Local Development
 
 For development and testing:
 
