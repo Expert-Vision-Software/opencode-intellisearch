@@ -1,0 +1,9 @@
+{  
+  "plugins": [  
+    {  
+      "name": "intellisearch-plugin",  
+      "source": "./",  
+      "skills": ["./assets/skills/intellisearch"]  
+    }  
+  ]  
+}
