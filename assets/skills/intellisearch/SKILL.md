@@ -4,7 +4,7 @@ description: Use this skill when the user asks to find, search for, or discover 
 license: MIT
 compatibility: opencode
 metadata:
-  version: 0.5.0
+  version: 0.5.1
   audience: agents
   topic: [github-discovery, api-reference, code-patterns, library-comparison]
   usage_tips: "Best used after a failed local search. Combines repo-finding with DeepWiki deep-querying."
