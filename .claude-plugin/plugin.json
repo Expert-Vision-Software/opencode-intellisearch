@@ -1,5 +1,5 @@
 {
-  "name": "intellisearch",
+  "name": "intellisearch-plugin",
   "description": "Intelligent GitHub repository discovery with DeepWiki integration for finding and comparing JavaScript/TypeScript libraries",
   "skills": ["./assets/skills/intellisearch"]
 }
