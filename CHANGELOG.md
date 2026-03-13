@@ -5,6 +5,28 @@ All notable changes to the intellisearch extension for OpenCode will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-03-13
+
+### Added
+- CLI with install/uninstall/status commands for plugin management
+- DeepWiki MCP server configuration support
+- Interactive prompts for permission and MCP setup
+- Workflow violation detection in E2E tests
+- Verbose mode and show-results option in E2E tests
+- Claude plugin compatibility (.codenomad support)
+- Cache cleanup for test isolation
+- Bash detection for curl fallback
+
+### Changed
+- Migrated root opencode.json to .opencode/ directory structure
+- Plugin now added to opencode.json plugin array on install
+- Normalized tool names to avoid duplicate lines in output
+- Updated skill for improved marketability and clarity
+
+### Fixed
+- Package-files test for new installer location
+- DeepWiki fallback when MCP tools unavailable
+
 ## [0.4.1] - 2025-03-08
 
 ### Added
