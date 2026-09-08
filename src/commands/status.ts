@@ -2,6 +2,9 @@ import { status } from "../installer.ts";
 
 export async function statusCommand(): Promise<void> {
   const result = await status(process.cwd());
+  const packageName = JSON.parse(
+    await Bun.file(`${import.meta.dirname}/../../package.json`).text()
+  ).name;
 
   const lines: string[] = [];
 
