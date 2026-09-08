@@ -32,8 +32,8 @@
   },
   "dependencies": {
     "@inquirer/prompts": "^8.3.0",
-    "@opencode-ai/plugin": "*",
-    "@opencode-ai/sdk": "^1.2.20"
+    "@opencode-ai/plugin": "^1.18.29",
+    "@opencode-ai/sdk": "^1.18.29"
   },
   "devDependencies": {
     "@types/bun": "latest",
