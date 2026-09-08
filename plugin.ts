@@ -1,4 +1,5 @@
-import type { Plugin, Config, PluginInput } from "@opencode-ai/plugin";
+import type { Plugin, PluginInput } from "@opencode-ai/plugin";
+import type { Config } from "@opencode-ai/sdk";
 import { install, readLocalConfig, mergeConfigWithOverrides, type Scope, type InstallResult } from "./src/installer.ts";
 import { RegistrationDetector } from "./src/registration.ts";
 

@@ -5,6 +5,26 @@ All notable changes to the intellisearch extension for OpenCode will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-09-08
+
+### Added
+- `RegistrationDetector` (`src/registration.ts`) for scope-aware load-time registration detection against the global opencode config and the repo's `.opencode/opencode.json` or repo-root `opencode.json`
+- `InstallManifest` (`src/manifest.ts`) with per-file sha256 entries to gate install writes per detected scope
+- `PluginNameNormalizer` (`src/plugin-name.ts`) for semantic `name ≡ name@latest ≡ name@x.y.z` matching and canonical `name@latest` writing
+- One-shot non-blocking install advisory: a single warn-level `client.app.log` entry plus a TUI toast when the plugin is unregistered and not installed anywhere; fires at most once per plugin session, suppressed when any scope holds an install, performs zero writes
+- `tests/contract/` regression suite porting the handoff's contract table: fresh-repo zero-writes, root-config preservation, valid/unparseable local configs, manifest no-op and version drift, both-scope handling, cross-scope isolation, advisory suppression and once-per-session semantics
+- `tests/helpers/global-sandbox.ts` to sandbox the global config via `XDG_CONFIG_HOME` so contract tests never touch the real global config
+- Ported five-scenario qcgates-style repro harness into `tests/contract/plugin.test.ts` asserting zero repo disk writes from the config hook across fresh, root-only, local-foreign, invalid-local, and control-up-to-date-local scenarios
+
+### Changed
+- `plugin.ts` now performs scope-aware, manifest-gated load-time installation instead of unconditional reinstalls
+- Installer hardened to share a single code path with the CLI: unparseable configs are preserved byte-for-byte with a warning; `--force` is CLI-only; root-config migration requires explicit consent and never runs at load
+- Plugin references are written canonically as `name@latest` with semantic dedup; `name@x.y.z` and bare `name` references are treated as the same package
+- Legacy `.version` markers inside installed skill directories are reconciled and removed on first manifest-era install
+
+### Removed
+- Old unconditional load-time reinstall behavior and the `addPluginConfig: true` / `migrateRootConfig: true` defaults at the config hook (the hook now installs assets only, never edits `plugin` arrays, never migrates root configs)
+
 ## [0.5.0] - 2026-03-13
 
 ### Added
