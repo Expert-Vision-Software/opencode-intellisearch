@@ -8,13 +8,17 @@ interface UninstallOptions {
 }
 
 export async function uninstallCommand(options: UninstallOptions): Promise<void> {
+  const packageName = JSON.parse(
+    await Bun.file(`${import.meta.dirname}/../../package.json`).text()
+  ).name;
+
   let scope: Scope;
 
   if (options.scope) {
     scope = options.scope;
   } else {
     const selected = await select({
-      message: "Where do you want to uninstall intellisearch from?",
+      message: `Where do you want to uninstall ${packageName} from?`,
       choices: [
         { name: "Local (project only)", value: "local" as Scope },
         { name: "Global (all projects)", value: "global" as Scope },
@@ -25,7 +29,7 @@ export async function uninstallCommand(options: UninstallOptions): Promise<void>
 
   if (!options.force) {
     const shouldContinue = await confirmOverwrite(
-      `Remove intellisearch from ${scope} installation?`
+      `Remove ${packageName} from ${scope} installation?`
     );
     if (!shouldContinue) {
       console.log("Uninstall cancelled.");
@@ -36,7 +40,7 @@ export async function uninstallCommand(options: UninstallOptions): Promise<void>
   const result = await uninstall(scope, process.cwd());
 
   if (result.removed.length > 0) {
-    console.log(`\nUninstalled intellisearch from ${scope} location:`);
+    console.log(`\nUninstalled ${packageName} from ${scope} location:`);
     for (const path of result.removed) {
       console.log(`  Removed: ${path}`);
     }
@@ -44,6 +48,6 @@ export async function uninstallCommand(options: UninstallOptions): Promise<void>
       console.log(`  Plugin: removed from config`);
     }
   } else {
-    console.log(`\nIntellisearch was not installed in ${scope} location.`);
+    console.log(`\n${packageName} was not installed in ${scope} location.`);
   }
 }

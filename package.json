@@ -1,6 +1,6 @@
 {
   "name": "opencode-intellisearch",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "type": "module",
   "module": "index.ts",
   "bin": {
@@ -32,8 +32,8 @@
   },
   "dependencies": {
     "@inquirer/prompts": "^8.3.0",
-    "@opencode-ai/plugin": "*",
-    "@opencode-ai/sdk": "^1.2.20"
+    "@opencode-ai/plugin": "^1.18.29",
+    "@opencode-ai/sdk": "^1.18.29"
   },
   "devDependencies": {
     "@types/bun": "latest",
