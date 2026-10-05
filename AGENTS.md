@@ -59,12 +59,21 @@ Analyze request → Answer directly → Keep response lean
 assets/
   skills/intellisearch/SKILL.md
   commands/search-intelligently.md
-plugin.ts
 index.ts
 package.json
 tsconfig.json
+src/
+  plugin.ts
+  installer.ts
+  manifest.ts
+  registration.ts
+  jsonc.ts
+  json-splice-editor.ts
+  cli.ts
+  commands/
 tests/
   unit/
+  contract/
   e2e/
     scripts/
       runner.ts
@@ -159,22 +168,23 @@ Query GitHub repository documentation:
 
 <implementation_details>
 <plugin_architecture>
-- Export: async function returning {hooks: {config?: () => Promise<void>}}
-- Config hook: runs once during OpenCode initialization
-- Assets: copied from package assets/ to project .opencode/
-- Version marker: .version file prevents duplicate installs
+- Export: index.ts re-exports the default plugin factory from src/plugin.ts (entry module default-only)
+- Config hook: runs once during OpenCode initialization; the entire hook body is wrapped in try/catch so OpenCode always launches
+- Assets: copied from package assets/ into each registered scope (.opencode/ locally, the global config dir globally)
+- Idempotency: manifest-gated via <configBase>/<package>.manifest.json recording version + per-file sha256 hashes; no .version markers
+- Registration detection: read-only config inspection (opencode.json, opencode.jsonc, global config.json), @latest-aware name matching
 - Logging: client.app.log()
-- Install location: ~/.cache/opencode/node_modules/
+- Install location: ~/.cache/opencode/packages/<spec>/node_modules/<package>
 </plugin_architecture>
 <asset_installation>
 Source: assets/ (published in package)
-Target: .opencode/skills/intellisearch/ and .opencode/commands/search-intelligently.md
+Target: <configBase>/skills/intellisearch/ and <configBase>/commands/search-intelligently.md
+Consumer-modified files are skipped with a warning unless --force is used
 </asset_installation>
 <config_modification>
-- Reads existing .opencode/opencode.json or creates new
-- Adds permission.skill.intellisearch: "allow" if not present
-- Preserves existing config values
-- Runs during config hook (one-time setup)
+- Permission (skill.intellisearch: "allow"), MCP (deepwiki), plugin registration, and root-config migration are CLI-only (--migrate gates migration, default false)
+- The load hook never edits plugin arrays, permissions, or MCP config; it only ensures payload assets in registered scopes
+- Registration writes are surgical text splices into the plugin array (indentation, comments, and unrelated keys preserved)
 </config_modification>
 </implementation_details>
 

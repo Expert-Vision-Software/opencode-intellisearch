@@ -1,6 +1,6 @@
 import { describe, test, expect } from "bun:test";
 import { join } from "node:path";
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { RegistrationDetector, type RegistrationContext } from "../../src/registration.ts";
 import { snapshotDirectory } from "../helpers/snapshot.ts";
 import { SANDBOX_GLOBAL_BASE, resetGlobalConfig, withGlobalSandbox, writeGlobalPluginConfig } from "../helpers/global-sandbox.ts";
@@ -122,6 +122,108 @@ describe("RegistrationDetector.detect", () => {
 
       expect(await snapshotDirectory(fixtureDir)).toEqual(before);
       expect(await snapshotDirectory(SANDBOX_GLOBAL_BASE)).toEqual(beforeGlobal);
+    });
+  });
+
+  test("returns repo-local for a nested opencode.jsonc registration", async () => {
+    await withGlobalSandbox(async () => {
+      await resetGlobalConfig();
+      const fixtureDir = await makeFixture("repo-nested-jsonc");
+      const localDir = join(fixtureDir, ".opencode");
+      await mkdir(localDir, { recursive: true });
+      await writeFile(
+        join(localDir, "opencode.jsonc"),
+        `{\n  "$schema": "https://opencode.ai/config.json",\n  "plugin": ["${PACKAGE_NAME}@latest"]\n}`
+      );
+      await expectContext(fixtureDir, "repo-local");
+    });
+  });
+
+  test("returns repo-local for a jsonc registration with a comment between a trailing comma and its closer", async () => {
+    await withGlobalSandbox(async () => {
+      await resetGlobalConfig();
+      const fixtureDir = await makeFixture("repo-jsonc-adversarial");
+      const localDir = join(fixtureDir, ".opencode");
+      await mkdir(localDir, { recursive: true });
+      const jsoncContent =
+        "{\n" +
+        '  "$schema": "https://opencode.ai/config.json",\n' +
+        '  "plugin": [\n' +
+        `    "${PACKAGE_NAME}",\n` +
+        "    // a comment after the trailing comma\n" +
+        "  ],\n" +
+        '  "model": "some/model"\n' +
+        "}";
+      const configPath = join(localDir, "opencode.jsonc");
+      await writeFile(configPath, jsoncContent);
+
+      await expectContext(fixtureDir, "repo-local");
+      expect(await readFile(configPath, "utf-8")).toBe(jsoncContent);
+    });
+  });
+
+  test("returns repo-local for a repo-root opencode.jsonc registration", async () => {
+    await withGlobalSandbox(async () => {
+      await resetGlobalConfig();
+      const fixtureDir = await makeFixture("repo-root-jsonc");
+      await writeFile(
+        join(fixtureDir, "opencode.jsonc"),
+        `{\n  // root jsonc\n  "plugin": ["${PACKAGE_NAME}"]\n}`
+      );
+      await expectContext(fixtureDir, "repo-local");
+    });
+  });
+
+  test("returns global for an opencode.jsonc global registration", async () => {
+    await withGlobalSandbox(async () => {
+      await resetGlobalConfig();
+      await mkdir(SANDBOX_GLOBAL_BASE, { recursive: true });
+      await writeFile(
+        join(SANDBOX_GLOBAL_BASE, "opencode.jsonc"),
+        `{\n  "plugin": ["${PACKAGE_NAME}"],\n}`
+      );
+      const fixtureDir = await makeFixture("global-jsonc");
+      await expectContext(fixtureDir, "global");
+    });
+  });
+
+  test("returns global for a legacy global config.json registration", async () => {
+    await withGlobalSandbox(async () => {
+      await resetGlobalConfig();
+      await mkdir(SANDBOX_GLOBAL_BASE, { recursive: true });
+      await writeFile(
+        join(SANDBOX_GLOBAL_BASE, "config.json"),
+        JSON.stringify({ $schema: "https://opencode.ai/config.json", plugin: [PACKAGE_NAME] }, null, 2)
+      );
+      const fixtureDir = await makeFixture("global-config-json");
+      await expectContext(fixtureDir, "global");
+    });
+  });
+
+  test("an unparseable jsonc candidate warns and never masks a registration elsewhere", async () => {
+    await withGlobalSandbox(async () => {
+      await resetGlobalConfig();
+      const fixtureDir = await makeFixture("repo-jsonc-unparseable");
+      const localDir = join(fixtureDir, ".opencode");
+      await mkdir(localDir, { recursive: true });
+      const brokenContent = '{\n  "plugin": ["opencode-architect"],\n  "model": ,\n}';
+      const brokenPath = join(localDir, "opencode.jsonc");
+      await writeFile(brokenPath, brokenContent);
+      await writeRootRepoConfig(fixtureDir, [PACKAGE_NAME]);
+
+      const warnings: string[] = [];
+      const originalWarn = console.warn;
+      console.warn = (message: unknown) => {
+        warnings.push(String(message));
+      };
+      try {
+        await expectContext(fixtureDir, "repo-local");
+      } finally {
+        console.warn = originalWarn;
+      }
+
+      expect(await readFile(brokenPath, "utf-8")).toBe(brokenContent);
+      expect(warnings.join("\n")).toContain("opencode.jsonc");
     });
   });
 });

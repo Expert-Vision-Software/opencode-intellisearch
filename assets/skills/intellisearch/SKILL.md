@@ -1,12 +1,12 @@
 ---
-name: intellisearch
-description: Use this skill when the user asks to find, search for, or discover JavaScript/TypeScript libraries, frameworks, packages, or GitHub repositories. Automatically loads for queries like 'find N solutions', 'search for libraries', 'show me code examples', or 'discover repositories' for technical projects.
-license: MIT
-compatibility: opencode
+name: "intellisearch"
+description: "Use this skill when the user asks to find, search for, or discover JavaScript/TypeScript libraries, frameworks, packages, or GitHub repositories. Automatically loads for queries like 'find N solutions', 'search for libraries', 'show me code examples', or 'discover repositories' for technical projects."
+license: "MIT"
+compatibility: "opencode"
 metadata:
-  version: 0.6.0
-  audience: agents
-  topic: [github-discovery, api-reference, code-patterns, library-comparison]
+  version: "0.6.0"
+  audience: "agents"
+  topic: "github-discovery, api-reference, code-patterns, library-comparison"
   usage_tips: "Best used after a failed local search. Combines repo-finding with DeepWiki deep-querying."
 ---
 

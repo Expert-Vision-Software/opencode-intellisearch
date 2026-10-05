@@ -71,8 +71,8 @@ Then add to your `opencode.json`:
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["opencode-intellisearch"],
-  "mcpServers": {
+  "plugin": ["opencode-intellisearch@latest"],
+  "mcp": {
     "deepwiki": {
       "url": "https://mcp.deepwiki.com/mcp"
     }
@@ -104,7 +104,7 @@ Or use path-based plugin loading in `opencode.json`:
 
 ```json
 {
-  "plugins": ["C:/dev/projects/github/opencode-intellisearch"]
+  "plugin": ["file:///C:/dev/projects/github/opencode-intellisearch"]
 }
 ```
 
@@ -115,7 +115,7 @@ Configure in `~/.config/opencode/opencode.json` or project `opencode.json`:
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "mcpServers": {
+  "mcp": {
     "deepwiki": {
       "url": "https://mcp.deepwiki.com/mcp"
     }
@@ -169,7 +169,7 @@ Remove from `opencode.json`:
 
 ```json
 {
-  "plugins": []
+  "plugin": []
 }
 ```
 
@@ -196,7 +196,7 @@ powershell -c "irm bun.sh/install.ps1 | iex"
 ### "Plugin not loading"
 
 1. Check OpenCode logs: `~/.local/share/opencode/log/`
-2. Verify plugin is in `opencode.json` plugins array
+2. Verify plugin is in `opencode.json` plugin array
 3. Ensure Bun is installed and in PATH
 
 ### "deepWiki unavailable"

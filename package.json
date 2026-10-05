@@ -17,9 +17,9 @@
     "email": "support@expertvisionsoftware.com"
   },
   "license": "MIT",
+  "content": "code",
   "files": [
     "index.ts",
-    "plugin.ts",
     "src",
     "assets"
   ],

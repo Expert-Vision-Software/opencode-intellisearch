@@ -2,19 +2,17 @@ import { select } from "@inquirer/prompts";
 import {
   install,
   checkMigrationNeeded,
-  type Scope,
+  type InstallMode,
   type InstallOptions,
+  type Scope,
 } from "../installer.ts";
-import {
-  confirmOverwrite,
-  confirmPermissionConfig,
-  confirmMcpConfig,
-  confirmPluginConfig,
-} from "../prompts.ts";
+import { confirmOverwrite, confirmPermissionConfig, confirmMcpConfig } from "../prompts.ts";
 
 interface InstallCommandOptions {
-  scope?: Scope;
-  force?: boolean;
+  scope: Scope | null;
+  force: boolean;
+  migrate: boolean;
+  mode: InstallMode | null;
 }
 
 export async function installCommand(options: InstallCommandOptions): Promise<void> {
@@ -23,7 +21,6 @@ export async function installCommand(options: InstallCommandOptions): Promise<vo
   ).name;
 
   let scope: Scope;
-  const interactive = !options.scope;
 
   if (options.scope) {
     scope = options.scope;
@@ -40,7 +37,7 @@ export async function installCommand(options: InstallCommandOptions): Promise<vo
 
   const projectDir = process.cwd();
 
-  if (scope === "local") {
+  if (scope === "local" && options.migrate) {
     const migration = await checkMigrationNeeded(projectDir);
 
     if (migration.needed && migration.rootConfig && migration.dotOpenencodeConfig) {
@@ -49,7 +46,7 @@ export async function installCommand(options: InstallCommandOptions): Promise<vo
         key => key in dotConfig
       );
 
-      if (hasConflict) {
+      if (hasConflict && !options.force) {
         const shouldContinue = await confirmOverwrite(
           "Both opencode.json and .opencode/opencode.json exist with conflicting keys. Continue with migration (.opencode takes precedence)?"
         );
@@ -62,15 +59,15 @@ export async function installCommand(options: InstallCommandOptions): Promise<vo
   }
 
   const installOptions: InstallOptions = {
+    mode: options.mode ?? "plugin",
     addPluginConfig: true,
     configurePermission: true,
     configureMcp: true,
-    migrateRootConfig: true,
+    migrateRootConfig: options.migrate === true,
     force: options.force === true,
   };
 
-  if (interactive) {
-    installOptions.addPluginConfig = await confirmPluginConfig();
+  if (!options.scope) {
     installOptions.configurePermission = await confirmPermissionConfig();
     installOptions.configureMcp = await confirmMcpConfig();
   }
@@ -110,5 +107,9 @@ export async function installCommand(options: InstallCommandOptions): Promise<vo
 
   if (result.mcpConfigured) {
     console.log(`  MCP: deepwiki server configured`);
+  }
+
+  for (const cleared of result.clearedCache) {
+    console.log(`  Cleared cache: ${cleared}`);
   }
 }

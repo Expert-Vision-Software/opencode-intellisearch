@@ -20,10 +20,3 @@ export async function confirmMcpConfig(): Promise<boolean> {
     default: true,
   });
 }
-
-export async function confirmPluginConfig(): Promise<boolean> {
-  return confirm({
-    message: "Add plugin to opencode.json config?",
-    default: true,
-  });
-}

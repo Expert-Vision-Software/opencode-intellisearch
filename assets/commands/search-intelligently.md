@@ -1,6 +1,6 @@
 ---
-description: Search GitHub repositories for technical answers using DeepWiki
-agent: general
+description: "Search GitHub repositories for technical answers using DeepWiki"
+agent: "general"
 subtask: true
 ---
 

@@ -3,8 +3,8 @@ import { uninstall, type Scope } from "../installer.ts";
 import { confirmOverwrite } from "../prompts.ts";
 
 interface UninstallOptions {
-  scope?: Scope;
-  force?: boolean;
+  scope: Scope | null;
+  force: boolean;
 }
 
 export async function uninstallCommand(options: UninstallOptions): Promise<void> {

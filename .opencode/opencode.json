@@ -1,6 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["@qforge/opencode-architect"],
+  "plugin": ["opencode-architect@^0.9.2"],
   "permission": {
     "MCP_DOCKER_duckduckgo*": "allow",
     "MCP_DOCKER_exa*": "allow",

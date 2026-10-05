@@ -318,7 +318,7 @@ bun link opencode-intellisearch --cwd ~/.cache/opencode/node_modules/
 Or use path-based plugin loading:
 ```json
 {
-  "plugins": ["C:/dev/projects/github/opencode-intellisearch"]
+  "plugin": ["file:///C:/dev/projects/github/opencode-intellisearch"]
 }
 ```
 

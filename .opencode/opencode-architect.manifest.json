@@ -1,0 +1,8 @@
+{
+  "version": "0.9.2",
+  "mode": "plugin",
+  "entry": "opencode-architect@latest",
+  "configPath": "/home/diegohb/.local/share/opencode/worktree/e80e770a8aa35e3816aecefc176d284e3ebb5d23/ocarchitect-conformity-changes/.opencode/opencode.json",
+  "content-hash": null,
+  "hashes": null
+}

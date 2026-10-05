@@ -54,6 +54,10 @@ export class InstallManifest {
     return this.contents !== null;
   }
 
+  recordedFiles(): ManifestFileEntry[] {
+    return this.contents?.files ?? [];
+  }
+
   matchesVersion(version: string): boolean {
     return this.contents !== null && this.contents.version === version;
   }
