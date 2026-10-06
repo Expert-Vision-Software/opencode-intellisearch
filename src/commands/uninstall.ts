@@ -3,8 +3,9 @@ import { uninstall, type Scope } from "../installer.ts";
 import { confirmOverwrite } from "../prompts.ts";
 
 interface UninstallOptions {
-  scope?: Scope;
-  force?: boolean;
+  scope: Scope | null;
+  force: boolean;
+  purgeConfig: boolean;
 }
 
 export async function uninstallCommand(options: UninstallOptions): Promise<void> {
@@ -35,19 +36,33 @@ export async function uninstallCommand(options: UninstallOptions): Promise<void>
       console.log("Uninstall cancelled.");
       return;
     }
+    if (options.purgeConfig) {
+      const shouldPurge = await confirmOverwrite(
+        `Also remove the ${packageName} plugin entry, skill.intellisearch permission, and deepwiki MCP server from the config?`
+      );
+      if (!shouldPurge) {
+        options.purgeConfig = false;
+      }
+    }
   }
 
-  const result = await uninstall(scope, process.cwd());
+  const result = await uninstall(scope, process.cwd(), { purgeConfig: options.purgeConfig });
 
   if (result.removed.length > 0) {
     console.log(`\nUninstalled ${packageName} from ${scope} location:`);
     for (const path of result.removed) {
       console.log(`  Removed: ${path}`);
     }
-    if (result.pluginRemoved) {
-      console.log(`  Plugin: removed from config`);
-    }
   } else {
     console.log(`\n${packageName} was not installed in ${scope} location.`);
+  }
+  if (result.pluginRemoved) {
+    console.log(`  Plugin: removed from config`);
+  }
+  if (result.permissionRemoved) {
+    console.log(`  Permission: skill.intellisearch removed from config`);
+  }
+  if (result.mcpRemoved) {
+    console.log(`  MCP: deepwiki server removed from config`);
   }
 }

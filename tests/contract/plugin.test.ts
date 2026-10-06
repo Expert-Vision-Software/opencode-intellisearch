@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import { join } from "node:path";
 import { exists, mkdir, rm, readFile, writeFile } from "node:fs/promises";
-import plugin from "../../plugin.ts";
+import plugin from "../../src/plugin.ts";
 import { install } from "../../src/installer.ts";
 import { snapshotDirectory } from "../helpers/snapshot.ts";
 import {
@@ -37,10 +37,8 @@ async function invokeConfigHook(fixtureDir: string, input: Record<string, unknow
   await (pluginResult.config as ((input: unknown) => Promise<void>) | undefined)?.(input);
 }
 
-async function expectSkillPermissions(input: Record<string, unknown>): Promise<void> {
-  const permission = input.permission as Record<string, unknown> | undefined;
-  const skillPermissions = permission?.skill as Record<string, string> | undefined;
-  expect(skillPermissions?.["intellisearch"]).toBe("allow");
+async function expectNoSkillPermissions(input: Record<string, unknown>): Promise<void> {
+  expect(input["permission"]).toBeUndefined();
 }
 
 describe("IntelliSearchPlugin", () => {
@@ -51,10 +49,10 @@ describe("IntelliSearchPlugin", () => {
     expect(typeof result.config).toBe("function");
   });
 
-  test("writes schema-compatible skill permission in memory", async () => {
+  test("does not inject skill permissions in memory (CLI-only configuration)", async () => {
     const input = {} as Record<string, unknown>;
     await invokeConfigHook(TEST_DIR, input);
-    expectSkillPermissions(input);
+    await expectNoSkillPermissions(input);
   });
 
   test("unregistered repo with nothing installed: config hook performs zero disk writes", async () => {
@@ -93,7 +91,7 @@ describe("IntelliSearchPlugin", () => {
       expect(await exists(join(fixtureDir, ".opencode", "commands", "search-intelligently.md"))).toBe(true);
       expect(await exists(join(fixtureDir, ".opencode", `${PACKAGE_NAME}.manifest.json`))).toBe(true);
       expect(input["model"]).toBe("some/model");
-      expectSkillPermissions(input);
+      await expectNoSkillPermissions(input);
     });
   });
 
@@ -331,7 +329,7 @@ describe("IntelliSearchPlugin", () => {
       expect(input["model"]).toBe("some/model");
       expect(input["$schema"]).toBe("https://opencode.ai/config.json");
       expect(input["plugin"]).toBeUndefined();
-      expectSkillPermissions(input);
+      await expectNoSkillPermissions(input);
     });
   });
 });
@@ -383,7 +381,7 @@ const REPRO_SCENARIOS: ReproScenario[] = [
         join(localDir, "opencode.json"),
         JSON.stringify({ $schema: "https://opencode.ai/config.json", plugin: ["opencode-intellisearch"] }, null, 2)
       );
-      await install("local", dir, { addPluginConfig: false, migrateRootConfig: false, force: false });
+      await install("local", dir, { mode: "plugin", addPluginConfig: false, migrateRootConfig: false, force: false, configurePermission: false, configureMcp: false });
     },
   },
 ];
@@ -417,13 +415,13 @@ describe("config hook repro scenarios ported from qcgates-repro", () => {
     });
   }
 
-  test("scenario E control still receives in-memory skill permissions", async () => {
+  test("scenario E control performs zero writes and injects no permissions", async () => {
     await withGlobalSandbox(async () => {
       await resetGlobalConfig();
       const fixtureDir = join(scenariosDir, "E-control-repo-up-to-date-local");
       const input = {} as Record<string, unknown>;
       await invokeConfigHook(fixtureDir, input);
-      expectSkillPermissions(input);
+      await expectNoSkillPermissions(input);
     });
   });
 });
@@ -510,7 +508,7 @@ describe("install advisory (one-shot)", () => {
         join(localDir, "opencode.json"),
         JSON.stringify({ $schema: "https://opencode.ai/config.json", plugin: ["opencode-architect"] }, null, 2)
       );
-      await install("local", fixtureDir, { addPluginConfig: false, migrateRootConfig: false, force: false });
+      await install("local", fixtureDir, { mode: "plugin", addPluginConfig: false, migrateRootConfig: false, force: false, configurePermission: false, configureMcp: false });
 
       const { client, captured } = makeCapturingClient();
       const before = await snapshotDirectory(fixtureDir);
@@ -519,6 +517,71 @@ describe("install advisory (one-shot)", () => {
       expect(captured.logs.length).toBe(0);
       expect(captured.toasts.length).toBe(0);
       expect(await snapshotDirectory(fixtureDir)).toEqual(before);
+    });
+  });
+});
+
+describe("failure advisory (one-shot, independent of the not-installed advisory)", () => {
+  function failureLogs(captured: CapturedAdvisory): Array<{ body?: { message?: string } }> {
+    return captured.logs.filter(log => (log.body?.message ?? "").includes("clear-cache"));
+  }
+
+  async function setupFailingGlobalScope(): Promise<void> {
+    await resetGlobalConfig();
+    await writeGlobalPluginConfig([PACKAGE_NAME]);
+    await writeFile(join(SANDBOX_GLOBAL_BASE, "skills"), "not a directory");
+  }
+
+  test("a failing ensure emits exactly one failure advisory naming the remediation command and cache dir", async () => {
+    await withGlobalSandbox(async () => {
+      await setupFailingGlobalScope();
+      const fixtureDir = await makeFixture("failure-advisory-fires");
+      const { client, captured } = makeCapturingClient();
+
+      // @ts-ignore - PluginInput requires full context, we only need directory and client
+      const pluginResult = await plugin({ directory: fixtureDir, client });
+      const config = pluginResult.config as ((input: unknown) => Promise<void>) | undefined;
+      await config?.({});
+
+      expect(failureLogs(captured).length).toBe(1);
+      const message = failureLogs(captured)[0]?.body?.message ?? "";
+      expect(message).toContain("bunx opencode-intellisearch clear-cache");
+      expect(message).toContain("bunx opencode-intellisearch install --scope global");
+      expect(message).toContain(`~/.cache/opencode/packages/${PACKAGE_NAME}@`);
+      expect(captured.toasts.length).toBe(1);
+      expect(captured.toasts[0]?.body?.message).toContain("clear-cache");
+    });
+  });
+
+  test("repeated failing config hook invocations emit exactly one failure advisory", async () => {
+    await withGlobalSandbox(async () => {
+      await setupFailingGlobalScope();
+      const fixtureDir = await makeFixture("failure-advisory-once");
+      const { client, captured } = makeCapturingClient();
+
+      // @ts-ignore - PluginInput requires full context, we only need directory and client
+      const pluginResult = await plugin({ directory: fixtureDir, client });
+      const config = pluginResult.config as ((input: unknown) => Promise<void>) | undefined;
+      await config?.({});
+      await config?.({});
+      await config?.({});
+
+      expect(failureLogs(captured).length).toBe(1);
+      expect(captured.toasts.length).toBe(1);
+    });
+  });
+
+  test("the not-installed advisory still fires independently in a later session", async () => {
+    await withGlobalSandbox(async () => {
+      await resetGlobalConfig();
+      const fixtureDir = await makeFixture("failure-then-d5");
+      const { client, captured } = makeCapturingClient();
+
+      await invokeConfigHookWithClient(fixtureDir, client);
+
+      expect(failureLogs(captured).length).toBe(0);
+      expect(captured.logs.length).toBe(1);
+      expect(captured.logs[0]?.body?.message).toContain("bunx opencode-intellisearch install --scope global");
     });
   });
 });

@@ -56,15 +56,26 @@ Analyze request → Answer directly → Keep response lean
 </development_commands>
 
 <project_structure>
-assets/
-  skills/intellisearch/SKILL.md
-  commands/search-intelligently.md
-plugin.ts
+skills/
+  intellisearch/SKILL.md
+  intellisearch/references/
+commands/
+  search-intelligently.md
 index.ts
 package.json
 tsconfig.json
+src/
+  plugin.ts
+  installer.ts
+  manifest.ts
+  registration.ts
+  jsonc.ts
+  json-splice-editor.ts
+  cli.ts
+  commands/
 tests/
   unit/
+  contract/
   e2e/
     scripts/
       runner.ts
@@ -104,7 +115,7 @@ tests/
 <commit_messages>Follow conventional commits: feat/fix/refactor/docs</commit_messages>
 <before_commit>
 1. Run bun run check - ensure no TypeScript errors
-2. Verify assets in assets/skills/ and assets/commands/
+2. Verify assets in skills/ and commands/
 3. Test locally using bun link workflow
 </before_commit>
 </workflow>
@@ -153,28 +164,29 @@ Query GitHub repository documentation:
 1. webfetch for GitHub repositories (site:github.com)
 2. Extract repository names
 3. DeepWiki tools for answers
-4. Reference: assets/skills/intellisearch/deepwiki-tools.md
+4. Reference: skills/intellisearch/deepwiki-tools.md
 </search_workflow>
 </tools>
 
 <implementation_details>
 <plugin_architecture>
-- Export: async function returning {hooks: {config?: () => Promise<void>}}
-- Config hook: runs once during OpenCode initialization
-- Assets: copied from package assets/ to project .opencode/
-- Version marker: .version file prevents duplicate installs
+- Export: index.ts re-exports the default plugin factory from src/plugin.ts (entry module default-only)
+- Config hook: runs once during OpenCode initialization; the entire hook body is wrapped in try/catch so OpenCode always launches
+- Assets: copied from the package-root skills/ and commands/ directories into each registered scope (.opencode/ locally, the global config dir globally)
+- Idempotency: manifest-gated via <configBase>/<package>.manifest.json recording version + per-file sha256 hashes; no .version markers
+- Registration detection: read-only config inspection (opencode.json, opencode.jsonc, global config.json), @latest-aware name matching
 - Logging: client.app.log()
-- Install location: ~/.cache/opencode/node_modules/
+- Install location: ~/.cache/opencode/packages/<spec>/node_modules/<package>
 </plugin_architecture>
 <asset_installation>
-Source: assets/ (published in package)
-Target: .opencode/skills/intellisearch/ and .opencode/commands/search-intelligently.md
+Source: skills/ and commands/ at the package root (published in package)
+Target: <configBase>/skills/intellisearch/ and <configBase>/commands/search-intelligently.md
+Consumer-modified files are skipped with a warning unless --force is used
 </asset_installation>
 <config_modification>
-- Reads existing .opencode/opencode.json or creates new
-- Adds permission.skill.intellisearch: "allow" if not present
-- Preserves existing config values
-- Runs during config hook (one-time setup)
+- Permission (skill.intellisearch: "allow"), MCP (deepwiki), plugin registration, and root-config migration are CLI-only (--migrate gates migration, default false)
+- The load hook never edits plugin arrays, permissions, or MCP config; it only ensures payload assets in registered scopes
+- Registration writes are surgical text splices into the plugin array (indentation, comments, and unrelated keys preserved)
 </config_modification>
 </implementation_details>
 

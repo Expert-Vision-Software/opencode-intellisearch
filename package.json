@@ -1,6 +1,6 @@
 {
   "name": "opencode-intellisearch",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "type": "module",
   "module": "index.ts",
   "bin": {
@@ -17,11 +17,15 @@
     "email": "support@expertvisionsoftware.com"
   },
   "license": "MIT",
+  "content": "code",
   "files": [
     "index.ts",
-    "plugin.ts",
     "src",
-    "assets"
+    "skills",
+    "commands",
+    "README.md",
+    "LICENSE",
+    "AGENTS.md"
   ],
   "scripts": {
     "check": "tsc --noEmit",

@@ -1,8 +1,9 @@
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import { join } from "node:path";
 import { exists, mkdir, rm, readFile, writeFile } from "node:fs/promises";
-import { install, migrateRootConfig, uninstall } from "../../src/installer.ts";
+import { install, collectAssetFiles, migrateRootConfig, uninstall, type InstallOptions } from "../../src/installer.ts";
 import { PluginNameNormalizer } from "../../src/plugin-name.ts";
+import { JsoncReader } from "../../src/jsonc.ts";
 import { snapshotDirectory } from "../helpers/snapshot.ts";
 import { SANDBOX_GLOBAL_BASE, resetGlobalConfig, withGlobalSandbox } from "../helpers/global-sandbox.ts";
 
@@ -55,7 +56,14 @@ async function captureWarnings(operation: () => Promise<void>): Promise<string[]
   return warnings;
 }
 
-const INSTALL_OPTIONS = { addPluginConfig: false, migrateRootConfig: false, force: false } as const;
+const INSTALL_OPTIONS: InstallOptions = {
+  mode: "plugin",
+  addPluginConfig: false,
+  migrateRootConfig: false,
+  force: false,
+  configurePermission: false,
+  configureMcp: false,
+};
 
 describe("PluginNameNormalizer", () => {
   test("normalize strips a version suffix", () => {
@@ -83,21 +91,149 @@ describe("PluginNameNormalizer", () => {
   });
 });
 
+describe("surgical config writes", () => {
+  test("install splices the plugin entry into a 4-space-indented config with comments, byte-identical otherwise", async () => {
+    const fixtureDir = await makeFixture("splice-4space");
+    const localDir = join(fixtureDir, ".opencode");
+    await mkdir(localDir, { recursive: true });
+    const before =
+      "{\n" +
+      '    "$schema": "https://opencode.ai/config.json",\n' +
+      "    // my preferred model\n" +
+      '    "model": "some/model"\n' +
+      "}";
+    await writeFile(join(localDir, "opencode.json"), before);
+
+    const result = await install("local", fixtureDir, {
+      mode: "plugin",
+      addPluginConfig: true,
+      migrateRootConfig: false,
+      force: false,
+      configurePermission: false,
+      configureMcp: false,
+    });
+
+    expect(result.pluginAdded).toBe(true);
+    const after = await readLocalConfigRaw(fixtureDir);
+    const expected =
+      "{\n" +
+      `    "plugin": ["${CANONICAL_PLUGIN_REF}"],\n` +
+      '    "$schema": "https://opencode.ai/config.json",\n' +
+      "    // my preferred model\n" +
+      '    "model": "some/model"\n' +
+      "}";
+    expect(after).toBe(expected);
+  });
+
+  test("install splices the plugin entry into a config with comments and a trailing comma, preserving both", async () => {
+    const fixtureDir = await makeFixture("splice-jsonc");
+    const localDir = join(fixtureDir, ".opencode");
+    await mkdir(localDir, { recursive: true });
+    const before =
+      "{\n" +
+      "  // my config\n" +
+      '  "$schema": "https://opencode.ai/config.json",\n' +
+      '  "model": "some/model", // inline comment\n' +
+      "}";
+    const configPath = join(localDir, "opencode.json");
+    await writeFile(configPath, before);
+
+    const result = await install("local", fixtureDir, {
+      mode: "plugin",
+      addPluginConfig: true,
+      migrateRootConfig: false,
+      force: false,
+      configurePermission: false,
+      configureMcp: false,
+    });
+
+    expect(result.pluginAdded).toBe(true);
+    const after = await readFile(configPath, "utf-8");
+    expect(after).toContain("// my config");
+    expect(after).toContain("// inline comment");
+    expect(after).toContain(`"plugin": ["${CANONICAL_PLUGIN_REF}"],`);
+    const parsed = JsoncReader.parse(after) as Record<string, unknown>;
+    expect(parsed["plugin"]).toEqual([CANONICAL_PLUGIN_REF]);
+    expect(parsed["model"]).toBe("some/model");
+  });
+
+  test("permission splice into an existing config preserves unrelated keys and formatting", async () => {
+    const fixtureDir = await makeFixture("splice-permission");
+    const localDir = join(fixtureDir, ".opencode");
+    await mkdir(localDir, { recursive: true });
+    const before =
+      "{\n" +
+      '  "$schema": "https://opencode.ai/config.json",\n' +
+      "  // keep me\n" +
+      '  "model": "some/model"\n' +
+      "}";
+    await writeFile(join(localDir, "opencode.json"), before);
+
+    const result = await install("local", fixtureDir, {
+      mode: "plugin",
+      addPluginConfig: false,
+      migrateRootConfig: false,
+      force: false,
+      configurePermission: true,
+      configureMcp: false,
+    });
+
+    expect(result.permissionConfigured).toBe(true);
+    const after = await readLocalConfigRaw(fixtureDir);
+    expect(after).toContain("// keep me");
+    expect(after).toContain('"model": "some/model"');
+    const parsed = JsoncReader.parse(after) as { permission?: { skill?: Record<string, string> } };
+    expect(parsed.permission?.skill?.["intellisearch"]).toBe("allow");
+  });
+
+  test("mcp splice into an existing config preserves unrelated keys and formatting", async () => {
+    const fixtureDir = await makeFixture("splice-mcp");
+    const localDir = join(fixtureDir, ".opencode");
+    await mkdir(localDir, { recursive: true });
+    const before =
+      "{\n" +
+      '  "$schema": "https://opencode.ai/config.json",\n' +
+      "  /* block comment */\n" +
+      '  "model": "some/model"\n' +
+      "}";
+    await writeFile(join(localDir, "opencode.json"), before);
+
+    const result = await install("local", fixtureDir, {
+      mode: "plugin",
+      addPluginConfig: false,
+      migrateRootConfig: false,
+      force: false,
+      configurePermission: false,
+      configureMcp: true,
+    });
+
+    expect(result.mcpConfigured).toBe(true);
+    const after = await readLocalConfigRaw(fixtureDir);
+    expect(after).toContain("/* block comment */");
+    const parsed = JsoncReader.parse(after) as { mcp?: Record<string, unknown> };
+    const server = parsed.mcp?.["deepwiki"] as { url?: string };
+    expect(server?.url).toBe("https://mcp.deepwiki.com/mcp");
+  });
+});
+
 describe("config writes over unparseable JSON", () => {
-  test("install refuses to rewrite an invalid local opencode.json and preserves it byte-for-byte", async () => {
+  test("install refuses to rewrite a genuinely malformed local opencode.json and preserves it byte-for-byte", async () => {
     const fixtureDir = await makeFixture("invalid-local-config");
     const localDir = join(fixtureDir, ".opencode");
     await mkdir(localDir, { recursive: true });
     const invalidContent =
-      '{\n  "$schema": "https://opencode.ai/config.json",\n  "plugin": [\n    "opencode-architect"\n  ],\n}';
+      '{\n  "$schema": "https://opencode.ai/config.json",\n  "plugin": [\n    "opencode-architect"\n  ],\n  "model": ;;;\n}';
     await writeFile(join(localDir, "opencode.json"), invalidContent);
 
     let pluginAdded = true;
     const warnings = await captureWarnings(async () => {
       const result = await install("local", fixtureDir, {
+        mode: "plugin",
         addPluginConfig: true,
         migrateRootConfig: false,
         force: false,
+        configurePermission: false,
+        configureMcp: false,
       });
       pluginAdded = result.pluginAdded;
     });
@@ -106,6 +242,30 @@ describe("config writes over unparseable JSON", () => {
     expect(await readLocalConfigRaw(fixtureDir)).toBe(invalidContent);
     expect(warnings.join("\n")).toContain("not valid JSON");
     expect(warnings.join("\n")).toContain("left unchanged");
+  });
+
+  test("install splices into a trailing-comma opencode.json without destroying the trailing comma", async () => {
+    const fixtureDir = await makeFixture("trailing-comma-local-config");
+    const localDir = join(fixtureDir, ".opencode");
+    await mkdir(localDir, { recursive: true });
+    const before =
+      '{\n  "$schema": "https://opencode.ai/config.json",\n  "plugin": [\n    "opencode-architect"\n  ],\n}';
+    await writeFile(join(localDir, "opencode.json"), before);
+
+    const result = await install("local", fixtureDir, {
+      mode: "plugin",
+      addPluginConfig: true,
+      migrateRootConfig: false,
+      force: false,
+      configurePermission: false,
+      configureMcp: false,
+    });
+
+    expect(result.pluginAdded).toBe(true);
+    const after = await readLocalConfigRaw(fixtureDir);
+    expect(after).toBe(
+      '{\n  "$schema": "https://opencode.ai/config.json",\n  "plugin": [\n    "opencode-intellisearch@latest",\n    "opencode-architect"\n  ],\n}'
+    );
   });
 
   test("migrateRootConfig refuses to migrate when the root config is unparseable and preserves it byte-for-byte", async () => {
@@ -125,13 +285,49 @@ describe("config writes over unparseable JSON", () => {
   });
 });
 
+describe("loud asset absence", () => {
+  test("missing commands asset directory fails loudly while skills exists", async () => {
+    const fixtureDir = await makeFixture("missing-commands");
+    const fakePackageDir = join(fixtureDir, "package");
+    await mkdir(join(fakePackageDir, "skills", "intellisearch"), { recursive: true });
+    await writeFile(join(fakePackageDir, "skills", "intellisearch", "SKILL.md"), "payload");
+
+    let thrown: unknown = null;
+    try {
+      await collectAssetFiles(fakePackageDir, PACKAGE_NAME, "0.0.0-test");
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(Error);
+    const message = (thrown as Error).message;
+    expect(message).toContain(join(fakePackageDir, "commands"));
+    expect(message).toContain(PACKAGE_NAME);
+    expect(message).toContain("clear-cache");
+    expect(message).toContain("install --scope global");
+  });
+
+  test("empty skills asset directory fails loudly", async () => {
+    const fixtureDir = await makeFixture("empty-skills");
+    const fakePackageDir = join(fixtureDir, "package");
+    await mkdir(join(fakePackageDir, "skills"), { recursive: true });
+    await mkdir(join(fakePackageDir, "commands"), { recursive: true });
+    await writeFile(join(fakePackageDir, "commands", "search-intelligently.md"), "payload");
+
+    expect(collectAssetFiles(fakePackageDir, PACKAGE_NAME, "0.0.0-test")).rejects.toThrow(PACKAGE_NAME);
+  });
+});
+
 describe("canonical plugin references", () => {
   test("install writes the plugin reference canonically as name@latest", async () => {
     const fixtureDir = await makeFixture("canonical-fresh");
     const result = await install("local", fixtureDir, {
+      mode: "plugin",
       addPluginConfig: true,
       migrateRootConfig: false,
       force: false,
+      configurePermission: false,
+      configureMcp: false,
     });
 
     expect(result.pluginAdded).toBe(true);
@@ -147,9 +343,12 @@ describe("canonical plugin references", () => {
     });
 
     const result = await install("local", fixtureDir, {
+      mode: "plugin",
       addPluginConfig: true,
       migrateRootConfig: false,
       force: false,
+      configurePermission: false,
+      configureMcp: false,
     });
 
     expect(result.pluginAdded).toBe(false);
@@ -164,9 +363,12 @@ describe("canonical plugin references", () => {
     });
 
     const result = await install("local", fixtureDir, {
+      mode: "plugin",
       addPluginConfig: true,
       migrateRootConfig: false,
       force: false,
+      configurePermission: false,
+      configureMcp: false,
     });
 
     expect(result.pluginAdded).toBe(false);
@@ -184,6 +386,52 @@ describe("canonical plugin references", () => {
 
     expect(result.pluginRemoved).toBe(true);
     expect(await readPluginArray(fixtureDir)).toEqual([]);
+  });
+});
+
+describe("manifest-scoped uninstall", () => {
+  test("uninstall removes only manifest-recorded files and leaves foreign payload untouched", async () => {
+    const fixtureDir = await makeFixture("uninstall-manifest-scoped");
+    await install("local", fixtureDir, INSTALL_OPTIONS);
+
+    const localDir = join(fixtureDir, ".opencode");
+    const foreignSkillDir = join(localDir, "skills", "some-other-skill");
+    await mkdir(foreignSkillDir, { recursive: true });
+    await writeFile(join(foreignSkillDir, "SKILL.md"), "foreign");
+    await writeFile(join(localDir, "commands", "foreign-command.md"), "foreign");
+
+    const result = await uninstall("local", fixtureDir);
+
+    expect(await exists(join(localDir, "skills", "intellisearch"))).toBe(false);
+    expect(await exists(join(localDir, "commands", "search-intelligently.md"))).toBe(false);
+    expect(await exists(foreignSkillDir)).toBe(true);
+    expect(await readFile(join(foreignSkillDir, "SKILL.md"), "utf-8")).toBe("foreign");
+    expect(await exists(join(localDir, "commands", "foreign-command.md"))).toBe(true);
+    expect(await exists(join(localDir, `${PACKAGE_NAME}.manifest.json`))).toBe(false);
+    expect(result.removed.length).toBeGreaterThan(0);
+    for (const removedPath of result.removed) {
+      expect(removedPath.startsWith(localDir)).toBe(true);
+      expect(removedPath.includes("some-other-skill")).toBe(false);
+      expect(removedPath.includes("foreign-command")).toBe(false);
+    }
+  });
+
+  test("uninstall without a manifest removes no payload files", async () => {
+    const fixtureDir = await makeFixture("uninstall-no-manifest");
+    const localDir = join(fixtureDir, ".opencode");
+    const skillDir = join(localDir, "skills", "intellisearch");
+    await mkdir(skillDir, { recursive: true });
+    await writeFile(join(skillDir, "SKILL.md"), "unmanaged");
+    await writeLocalConfig(fixtureDir, {
+      $schema: "https://opencode.ai/config.json",
+      plugin: [PACKAGE_NAME],
+    });
+
+    const result = await uninstall("local", fixtureDir);
+
+    expect(await readFile(join(skillDir, "SKILL.md"), "utf-8")).toBe("unmanaged");
+    expect(result.pluginRemoved).toBe(true);
+    expect(result.removed).toEqual([]);
   });
 });
 
@@ -244,8 +492,7 @@ describe("install manifest", () => {
     expect(await readFile(skillFile, "utf-8")).toBe("# consumer modified this file");
 
     const forcedResult = await install("local", fixtureDir, {
-      addPluginConfig: false,
-      migrateRootConfig: false,
+      ...INSTALL_OPTIONS,
       force: true,
     });
     expect(forcedResult.action).toBe("upgraded");
@@ -303,9 +550,9 @@ describe("root config migration guard", () => {
     );
 
     const result = await install("local", fixtureDir, {
+      ...INSTALL_OPTIONS,
       addPluginConfig: true,
       migrateRootConfig: true,
-      force: false,
     });
 
     expect(result.migrated).toBe(true);
@@ -314,12 +561,41 @@ describe("root config migration guard", () => {
     expect(migrated["model"]).toBe("some/model");
     expect(migrated["plugin"]).toEqual([CANONICAL_PLUGIN_REF]);
   });
+
+  test("migration merge preserves the dot config formatting and carries root-only keys", async () => {
+    const fixtureDir = await makeFixture("migration-merge-splice");
+    const rootContent =
+      "{\n" +
+      '  "$schema": "https://opencode.ai/config.json",\n' +
+      '  "model": "root/model"\n' +
+      "}";
+    await writeFile(join(fixtureDir, "opencode.json"), rootContent);
+    const localDir = join(fixtureDir, ".opencode");
+    await mkdir(localDir, { recursive: true });
+    const dotContent =
+      "{\n" +
+      "  // dot config stays authoritative\n" +
+      '  "model": "dot/model"\n' +
+      "}";
+    await writeFile(join(localDir, "opencode.json"), dotContent);
+
+    const migrated = await migrateRootConfig(fixtureDir, { enabled: true });
+
+    expect(migrated).toBe(true);
+    expect(await exists(join(fixtureDir, "opencode.json"))).toBe(false);
+    const after = await readFile(join(localDir, "opencode.json"), "utf-8");
+    expect(after).toContain("// dot config stays authoritative");
+    const parsed = JsoncReader.parse(after) as Record<string, unknown>;
+    expect(parsed["model"]).toBe("dot/model");
+    expect(parsed["$schema"]).toBe("https://opencode.ai/config.json");
+  });
 });
 
 describe("permission and MCP config (CLI-driven)", () => {
-  test("install configures the skill permission by default", async () => {
-    const fixtureDir = await makeFixture("permission-default");
+  test("install configures the skill permission when requested", async () => {
+    const fixtureDir = await makeFixture("permission-cli");
     const result = await install("local", fixtureDir, {
+      mode: "plugin",
       addPluginConfig: true,
       configurePermission: true,
       configureMcp: false,
@@ -333,9 +609,10 @@ describe("permission and MCP config (CLI-driven)", () => {
     expect(permission?.skill?.["intellisearch"]).toBe("allow");
   });
 
-  test("install configures the DeepWiki MCP server by default", async () => {
-    const fixtureDir = await makeFixture("mcp-default");
+  test("install configures the DeepWiki MCP server when requested", async () => {
+    const fixtureDir = await makeFixture("mcp-cli");
     const result = await install("local", fixtureDir, {
+      mode: "plugin",
       addPluginConfig: true,
       configurePermission: false,
       configureMcp: true,
@@ -354,13 +631,7 @@ describe("permission and MCP config (CLI-driven)", () => {
 
   test("permission and MCP config are skipped when disabled", async () => {
     const fixtureDir = await makeFixture("config-disabled");
-    const result = await install("local", fixtureDir, {
-      addPluginConfig: false,
-      configurePermission: false,
-      configureMcp: false,
-      migrateRootConfig: false,
-      force: false,
-    });
+    const result = await install("local", fixtureDir, INSTALL_OPTIONS);
 
     expect(result.permissionConfigured).toBe(false);
     expect(result.mcpConfigured).toBe(false);

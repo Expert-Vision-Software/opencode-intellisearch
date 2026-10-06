@@ -10,10 +10,13 @@ import {
 
 export type RegistrationContext = "none" | "global" | "repo-local" | "both";
 
+const GLOBAL_BASE_FILES = ["opencode.json", "opencode.jsonc", "config.json"];
+const BASE_FILES = ["opencode.json", "opencode.jsonc"];
+
 export class RegistrationDetector {
   static async detect(directory: string): Promise<RegistrationContext> {
     const packageName = await getPackageName();
-    const globalRegistered = await isPluginInConfig(join(getGlobalConfigPath(), "opencode.json"), packageName);
+    const globalRegistered = await RegistrationDetector.isRegisteredInGlobalBase(packageName);
     const repoLocalRegistered = await RegistrationDetector.isRegisteredInRepo(directory, packageName);
 
     if (globalRegistered && repoLocalRegistered) {
@@ -50,12 +53,37 @@ export class RegistrationDetector {
     return isScopeInstalled(getLocalConfigPath(directory), packageName);
   }
 
-  private static async isRegisteredInRepo(directory: string, packageName: string): Promise<boolean> {
-    const nestedConfigPath = join(getLocalConfigPath(directory), "opencode.json");
-    if (await isPluginInConfig(nestedConfigPath, packageName)) {
-      return true;
+  private static candidatePaths(base: string, fileNames: string[]): string[] {
+    return fileNames.map(fileName => join(base, fileName));
+  }
+
+  private static async anyCandidateRegisters(
+    candidatePaths: string[],
+    packageName: string
+  ): Promise<boolean> {
+    const outcomes: boolean[] = [];
+    for (const candidatePath of candidatePaths) {
+      outcomes.push(await isPluginInConfig(candidatePath, packageName));
     }
-    const rootConfigPath = join(directory, "opencode.json");
-    return isPluginInConfig(rootConfigPath, packageName);
+    return outcomes.some(registered => registered);
+  }
+
+  private static async isRegisteredInGlobalBase(packageName: string): Promise<boolean> {
+    const globalCandidates = RegistrationDetector.candidatePaths(getGlobalConfigPath(), GLOBAL_BASE_FILES);
+    return RegistrationDetector.anyCandidateRegisters(globalCandidates, packageName);
+  }
+
+  private static async isRegisteredInBase(base: string, packageName: string): Promise<boolean> {
+    const baseCandidates = RegistrationDetector.candidatePaths(base, BASE_FILES);
+    return RegistrationDetector.anyCandidateRegisters(baseCandidates, packageName);
+  }
+
+  private static async isRegisteredInRepo(directory: string, packageName: string): Promise<boolean> {
+    const nestedRegistered = await RegistrationDetector.isRegisteredInBase(
+      getLocalConfigPath(directory),
+      packageName
+    );
+    const rootRegistered = await RegistrationDetector.isRegisteredInBase(directory, packageName);
+    return nestedRegistered || rootRegistered;
   }
 }

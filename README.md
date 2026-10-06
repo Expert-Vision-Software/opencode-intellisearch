@@ -1,8 +1,6 @@
 # IntelliSearch — AI Agent GitHub Search & Research Intelligence
 
-[![OpenCode Plugin](https://img.shields.io/badge/OpenCode-Plugin-blue)](https://opencode.ai)
-[![npm version](https://img.shields.io/npm/v/opencode-intellisearch)](https://www.npmjs.com/package/opencode-intellisearch)
-[![MIT License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+[![npm version](https://img.shields.io/npm/v/opencode-intellisearch)](https://www.npmjs.com/package/opencode-intellisearch) [![Bun](https://img.shields.io/badge/runtime-bun-f472b6)](https://bun.sh) [![MIT License](https://img.shields.io/badge/License-MIT-green)](LICENSE) [![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Linux%20%7C%20Windows-blue)](https://bun.sh) [![OpenCode Plugin](https://img.shields.io/badge/OpenCode-Plugin-blue)](https://opencode.ai)
 
 **Give your AI agent GitHub superpowers.** IntelliSearch is an OpenCode plugin that equips autonomous agents with intelligent repository search and DeepWiki-powered answers—eliminating manual web searches and enabling smarter, faster technical research.
 
@@ -190,7 +188,7 @@ The installer automatically configures the deepwiki MCP server. For manual setup
 
 ```json
 {
-  "mcpServers": {
+  "mcp": {
     "deepwiki": {
       "url": "https://mcp.deepwiki.com/mcp"
     }
@@ -218,7 +216,7 @@ The installer automatically configures the deepwiki MCP server. For manual setup
 ### "Plugin not loading"
 
 - Check OpenCode logs: `~/.local/share/opencode/log/`
-- Verify plugin is in `opencode.json` plugins array
+- Verify plugin is in `opencode.json` plugin array
 - Ensure Bun is installed and in PATH
 
 ---

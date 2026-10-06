@@ -5,6 +5,30 @@ All notable changes to the intellisearch extension for OpenCode will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-10-05
+
+### Added
+- `clear-cache` CLI subcommand (self-scoped only) plus best-effort pruning of this package's own cache copies on every install
+- `--migrate` consent flag for root-config migration; migration is now opt-in and defaults to off
+- `uninstall --purge-config` to additionally remove the package-managed permission, MCP, and plugin config entries (conservative default unchanged)
+- Lenient JSONC config reader (`src/jsonc.ts`): scope detection consults `opencode.jsonc` alongside `opencode.json` plus the legacy global `config.json`, warning on unparseable candidates without masking registrations
+- Load-hook failure advisory: the config hook is fully wrapped in try/catch and emits a single once-guarded advisory naming the cache directory and remediation commands when installation fails
+- `CopyModeUnsupportedError` enforcement with `"content": "code"` declared in package.json; copy-mode requests fail loudly for this code-backed package
+- Contract and unit regression suites for JSONC detection, surgical config splicing, cache hygiene, uninstall purge, and package file layout
+
+### Changed
+- Config writers now perform surgical text splices (`src/json-splice-editor.ts`) preserving indentation, comments, trailing commas, and key order; unparseable files are refused byte-for-byte instead of rewritten
+- Permission and MCP configuration is CLI-only; the load hook installs payload assets only and never edits registrations
+- Plugin entry point moved to `src/plugin.ts` with `index.ts` as the only root code file (default-only export)
+- Asset layout migrated from the legacy `assets/` wrapper to repo-root `skills/` and `commands/` directories
+- Skill and command frontmatter values fully quoted; skill metadata normalized to a string-to-string map
+- README badge row condensed to a single line; all shipped config snippets use the valid `plugin` and `mcp` keys with canonical `name@latest` / `file:///` entries
+- Detection evaluates every candidate config base before deciding so unparseable-file warnings can never be skipped by a higher-priority match
+
+### Fixed
+- Uninstall removes only manifest-recorded paths and no longer deletes foreign or consumer-authored skills and commands
+- Missing bundled asset directories now fail loudly instead of leaving a scope looking installed with a partial payload
+
 ## [0.6.0] - 2026-09-08
 
 ### Added

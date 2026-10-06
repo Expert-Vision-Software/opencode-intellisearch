@@ -25,9 +25,9 @@ bun install
 
 ```
 opencode-intellisearch/
-├── assets/                      # Published directly
-│   ├── skills/intellisearch/    # Skill definition
-│   └── commands/                # Command definitions
+├── skills/                        # Skill payload (published directly)
+│   └── intellisearch/             # Skill definition
+├── commands/                      # Command definitions (published directly)
 ├── plugin.ts                    # OpenCode plugin entry (~45 lines)
 ├── index.ts                     # Plugin re-export
 ├── package.json                 # Bun-native configuration
@@ -47,7 +47,7 @@ opencode-intellisearch/
 
 ### Skill Development
 
-Skills are defined in `assets/skills/intellisearch/SKILL.md`.
+Skills are defined in `skills/intellisearch/SKILL.md`.
 
 **Frontmatter Requirements:**
 - `name`: 1-64 characters, lowercase alphanumeric with hyphens
@@ -57,7 +57,7 @@ Skills are defined in `assets/skills/intellisearch/SKILL.md`.
 
 ### Command Development
 
-Commands are defined in `assets/commands/search-intelligently.md`.
+Commands are defined in `commands/search-intelligently.md`.
 
 **Frontmatter:**
 ```yaml
@@ -71,7 +71,7 @@ subtask: true
 ### Plugin Development
 
 The plugin (`plugin.ts`) handles:
-- Copying assets from `assets/` to target `.opencode/`
+- Copying assets from the package-root `skills/` and `commands/` directories to target `.opencode/`
 - Version marker (`.version`) to prevent duplicate installs
 - Automatic skill permission configuration
 
@@ -318,7 +318,7 @@ bun link opencode-intellisearch --cwd ~/.cache/opencode/node_modules/
 Or use path-based plugin loading:
 ```json
 {
-  "plugins": ["C:/dev/projects/github/opencode-intellisearch"]
+  "plugin": ["file:///C:/dev/projects/github/opencode-intellisearch"]
 }
 ```
 

@@ -71,8 +71,8 @@ Then add to your `opencode.json`:
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugins": ["opencode-intellisearch"],
-  "mcpServers": {
+  "plugin": ["opencode-intellisearch@latest"],
+  "mcp": {
     "deepwiki": {
       "url": "https://mcp.deepwiki.com/mcp"
     }
@@ -104,7 +104,7 @@ Or use path-based plugin loading in `opencode.json`:
 
 ```json
 {
-  "plugins": ["C:/dev/projects/github/opencode-intellisearch"]
+  "plugin": ["file:///C:/dev/projects/github/opencode-intellisearch"]
 }
 ```
 
@@ -115,7 +115,7 @@ Configure in `~/.config/opencode/opencode.json` or project `opencode.json`:
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "mcpServers": {
+  "mcp": {
     "deepwiki": {
       "url": "https://mcp.deepwiki.com/mcp"
     }
@@ -165,11 +165,38 @@ Verify `deepwiki` server is running.
 
 ## Uninstallation
 
+### CLI
+
+```bash
+# Interactive (asks for scope and confirmation)
+bunx opencode-intellisearch uninstall
+
+# Non-interactive, local scope
+bunx opencode-intellisearch uninstall --scope local --force
+
+# Also remove the package-managed config entries
+bunx opencode-intellisearch uninstall --scope local --purge-config
+```
+
+By default, uninstall is conservative: it removes the manifest-recorded skill and command
+files and the `opencode-intellisearch` entry from the `plugin` array, leaving an empty
+`"plugin": []` behind (the documented manual state). The `permission.skill.intellisearch`
+permission and the `deepwiki` MCP server entry are left untouched since they may hold
+consumer edits.
+
+Pass `--purge-config` to also remove those package-managed config entries: the
+`opencode-intellisearch` plugin entry, `permission.skill.intellisearch`, and the
+`mcp.deepwiki` server. Unrelated keys (other plugins, other permissions, other MCP
+servers, comments, formatting) are never touched, and a config file that fails to parse
+is preserved byte-for-byte.
+
+### Manual
+
 Remove from `opencode.json`:
 
 ```json
 {
-  "plugins": []
+  "plugin": []
 }
 ```
 
@@ -196,7 +223,7 @@ powershell -c "irm bun.sh/install.ps1 | iex"
 ### "Plugin not loading"
 
 1. Check OpenCode logs: `~/.local/share/opencode/log/`
-2. Verify plugin is in `opencode.json` plugins array
+2. Verify plugin is in `opencode.json` plugin array
 3. Ensure Bun is installed and in PATH
 
 ### "deepWiki unavailable"
