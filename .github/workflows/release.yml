@@ -1,0 +1,137 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (e.g. v1.2.0)"
+        required: true
+        type: string
+      ref:
+        description: "Git ref to tag (commit SHA, branch name, or tag)"
+        required: true
+        type: string
+
+concurrency:
+  group: release
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.parse-version.outputs.version }}
+    steps:
+      - name: Checkout
+        if: github.event_name == 'push'
+        uses: actions/checkout@v4
+
+      - name: Checkout at ref
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Parse version
+        id: parse-version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Release version: $VERSION"
+
+      - name: Extract release notes from CHANGELOG.md
+        id: notes
+        run: |
+          node -e "
+            const version = '${{ steps.parse-version.outputs.version }}'.replace(/^v/, '');
+            const fs = require('fs');
+            const content = fs.readFileSync('CHANGELOG.md', 'utf8');
+            const sections = content.split(/(?=^## )/m);
+            let found = false;
+            let notes = '';
+            for (const section of sections) {
+              const m = section.match(/^## \[([^\]]+)\].*?-\s*(\d{4}-\d{2}-\d{2})/s);
+              if (m && m[1].replace(/^v/, '') === version) {
+                notes = section.replace(/^## \[[^\]]+\].*?-\s*\d{4}-\d{2}-\d{2}\n/, '').trim();
+                found = true;
+                break;
+              }
+            }
+            if (!found) {
+              console.error('No changelog section found for version:', version);
+              process.exit(1);
+            }
+            fs.writeFileSync('RELEASE_NOTES.md', notes);
+            console.log('Extracted', notes.split('\n').length, 'lines for version', version);
+          "
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.parse-version.outputs.version }}
+          name: ${{ steps.parse-version.outputs.version }}
+          body_path: RELEASE_NOTES.md
+          draft: false
+          prerelease: ${{ contains(steps.parse-version.outputs.version, '-') }}
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    needs: release
+    permissions:
+      contents: read
+      id-token: write
+    if: github.event_name == 'push'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Validate prepublish checks
+        run: |
+          bun run check
+          bun test
+
+      - name: Verify tarball contents
+        run: |
+          bun pm pack --dry-run --json > tarball.json
+          node -e "
+            const fs = require('fs');
+            const expected = ['index.ts', 'src', 'skills', 'commands', 'README.md', 'LICENSE', 'AGENTS.md'];
+            const [pack] = JSON.parse(fs.readFileSync('tarball.json', 'utf8'));
+            const paths = pack.files.map((f) => f.path);
+            const missing = expected.filter(
+              (entry) => !paths.some((p) => p === entry || p.startsWith(entry + '/'))
+            );
+            if (missing.length > 0) {
+              console.error('Tarball is missing expected bundled paths: ' + missing.join(', '));
+              process.exit(1);
+            }
+            console.log('Tarball contains all expected paths: ' + expected.join(', '));
+          "
+
+      - name: Publish to npm
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
+          bun publish --provenance --access public
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
