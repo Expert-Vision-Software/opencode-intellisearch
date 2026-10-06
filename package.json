@@ -21,7 +21,11 @@
   "files": [
     "index.ts",
     "src",
-    "assets"
+    "skills",
+    "commands",
+    "README.md",
+    "LICENSE",
+    "AGENTS.md"
   ],
   "scripts": {
     "check": "tsc --noEmit",

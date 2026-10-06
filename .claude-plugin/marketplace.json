@@ -3,7 +3,7 @@
     {  
       "name": "intellisearch-plugin",  
       "source": "./",  
-      "skills": ["./assets/skills/intellisearch"]  
+      "skills": ["./skills/intellisearch"]  
     }  
   ]  
 }

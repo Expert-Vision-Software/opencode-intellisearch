@@ -13,7 +13,8 @@ describe("package files validation", () => {
 
     expect(files).toContain("index.ts");
     expect(files).toContain("src");
-    expect(files).toContain("assets");
+    expect(files).toContain("skills");
+    expect(files).toContain("commands");
   });
 
   test("should declare code-backed content", async () => {

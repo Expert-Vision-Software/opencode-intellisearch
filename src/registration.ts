@@ -10,6 +10,9 @@ import {
 
 export type RegistrationContext = "none" | "global" | "repo-local" | "both";
 
+const GLOBAL_BASE_FILES = ["opencode.json", "opencode.jsonc", "config.json"];
+const BASE_FILES = ["opencode.json", "opencode.jsonc"];
+
 export class RegistrationDetector {
   static async detect(directory: string): Promise<RegistrationContext> {
     const packageName = await getPackageName();
@@ -50,20 +53,29 @@ export class RegistrationDetector {
     return isScopeInstalled(getLocalConfigPath(directory), packageName);
   }
 
-  private static async isRegisteredInGlobalBase(packageName: string): Promise<boolean> {
-    const globalBase = getGlobalConfigPath();
-    const jsonOutcome = await isPluginInConfig(join(globalBase, "opencode.json"), packageName);
-    const jsoncOutcome = await isPluginInConfig(join(globalBase, "opencode.jsonc"), packageName);
-    if (jsonOutcome || jsoncOutcome) {
-      return true;
+  private static candidatePaths(base: string, fileNames: string[]): string[] {
+    return fileNames.map(fileName => join(base, fileName));
+  }
+
+  private static async anyCandidateRegisters(
+    candidatePaths: string[],
+    packageName: string
+  ): Promise<boolean> {
+    const outcomes: boolean[] = [];
+    for (const candidatePath of candidatePaths) {
+      outcomes.push(await isPluginInConfig(candidatePath, packageName));
     }
-    return isPluginInConfig(join(globalBase, "config.json"), packageName);
+    return outcomes.some(registered => registered);
+  }
+
+  private static async isRegisteredInGlobalBase(packageName: string): Promise<boolean> {
+    const globalCandidates = RegistrationDetector.candidatePaths(getGlobalConfigPath(), GLOBAL_BASE_FILES);
+    return RegistrationDetector.anyCandidateRegisters(globalCandidates, packageName);
   }
 
   private static async isRegisteredInBase(base: string, packageName: string): Promise<boolean> {
-    const jsonOutcome = await isPluginInConfig(join(base, "opencode.json"), packageName);
-    const jsoncOutcome = await isPluginInConfig(join(base, "opencode.jsonc"), packageName);
-    return jsonOutcome || jsoncOutcome;
+    const baseCandidates = RegistrationDetector.candidatePaths(base, BASE_FILES);
+    return RegistrationDetector.anyCandidateRegisters(baseCandidates, packageName);
   }
 
   private static async isRegisteredInRepo(directory: string, packageName: string): Promise<boolean> {
@@ -71,9 +83,7 @@ export class RegistrationDetector {
       getLocalConfigPath(directory),
       packageName
     );
-    if (nestedRegistered) {
-      return true;
-    }
-    return RegistrationDetector.isRegisteredInBase(directory, packageName);
+    const rootRegistered = await RegistrationDetector.isRegisteredInBase(directory, packageName);
+    return nestedRegistered || rootRegistered;
   }
 }

@@ -24,6 +24,8 @@ Options:
   -s, --scope <scope>    Installation scope: "local" or "global"
   -m, --mode <mode>      Install mode: "plugin" (default) or "copy" (unsupported: this package is code-backed)
       --migrate          Consent to migrating a root opencode.json into .opencode/ (local installs only, default: false)
+      --purge-config     With uninstall, also remove the package-managed config entries
+                         (plugin entry, skill.intellisearch permission, deepwiki MCP server)
   -f, --force            Skip confirmation prompts / overwrite consumer-modified files
   -h, --help             Show this help message
   -v, --version          Show version
@@ -33,6 +35,7 @@ Examples:
   opencode-intellisearch install --scope global
   opencode-intellisearch install --scope local --migrate
   opencode-intellisearch uninstall --scope local
+  opencode-intellisearch uninstall --scope local --purge-config
   opencode-intellisearch status
   opencode-intellisearch clear-cache
 `);
@@ -54,6 +57,10 @@ async function main(): Promise<void> {
         short: "m",
       },
       migrate: {
+        type: "boolean",
+        default: false,
+      },
+      "purge-config": {
         type: "boolean",
         default: false,
       },
@@ -109,7 +116,7 @@ async function main(): Promise<void> {
         await installCommand({ scope: scope ?? null, force, migrate, mode });
         break;
       case "uninstall":
-        await uninstallCommand({ scope: scope ?? null, force });
+        await uninstallCommand({ scope: scope ?? null, force, purgeConfig: values["purge-config"] === true });
         break;
       case "status":
         await statusCommand();

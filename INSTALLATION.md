@@ -165,6 +165,33 @@ Verify `deepwiki` server is running.
 
 ## Uninstallation
 
+### CLI
+
+```bash
+# Interactive (asks for scope and confirmation)
+bunx opencode-intellisearch uninstall
+
+# Non-interactive, local scope
+bunx opencode-intellisearch uninstall --scope local --force
+
+# Also remove the package-managed config entries
+bunx opencode-intellisearch uninstall --scope local --purge-config
+```
+
+By default, uninstall is conservative: it removes the manifest-recorded skill and command
+files and the `opencode-intellisearch` entry from the `plugin` array, leaving an empty
+`"plugin": []` behind (the documented manual state). The `permission.skill.intellisearch`
+permission and the `deepwiki` MCP server entry are left untouched since they may hold
+consumer edits.
+
+Pass `--purge-config` to also remove those package-managed config entries: the
+`opencode-intellisearch` plugin entry, `permission.skill.intellisearch`, and the
+`mcp.deepwiki` server. Unrelated keys (other plugins, other permissions, other MCP
+servers, comments, formatting) are never touched, and a config file that fails to parse
+is preserved byte-for-byte.
+
+### Manual
+
 Remove from `opencode.json`:
 
 ```json

@@ -56,9 +56,11 @@ Analyze request → Answer directly → Keep response lean
 </development_commands>
 
 <project_structure>
-assets/
-  skills/intellisearch/SKILL.md
-  commands/search-intelligently.md
+skills/
+  intellisearch/SKILL.md
+  intellisearch/references/
+commands/
+  search-intelligently.md
 index.ts
 package.json
 tsconfig.json
@@ -113,7 +115,7 @@ tests/
 <commit_messages>Follow conventional commits: feat/fix/refactor/docs</commit_messages>
 <before_commit>
 1. Run bun run check - ensure no TypeScript errors
-2. Verify assets in assets/skills/ and assets/commands/
+2. Verify assets in skills/ and commands/
 3. Test locally using bun link workflow
 </before_commit>
 </workflow>
@@ -162,7 +164,7 @@ Query GitHub repository documentation:
 1. webfetch for GitHub repositories (site:github.com)
 2. Extract repository names
 3. DeepWiki tools for answers
-4. Reference: assets/skills/intellisearch/deepwiki-tools.md
+4. Reference: skills/intellisearch/deepwiki-tools.md
 </search_workflow>
 </tools>
 
@@ -170,14 +172,14 @@ Query GitHub repository documentation:
 <plugin_architecture>
 - Export: index.ts re-exports the default plugin factory from src/plugin.ts (entry module default-only)
 - Config hook: runs once during OpenCode initialization; the entire hook body is wrapped in try/catch so OpenCode always launches
-- Assets: copied from package assets/ into each registered scope (.opencode/ locally, the global config dir globally)
+- Assets: copied from the package-root skills/ and commands/ directories into each registered scope (.opencode/ locally, the global config dir globally)
 - Idempotency: manifest-gated via <configBase>/<package>.manifest.json recording version + per-file sha256 hashes; no .version markers
 - Registration detection: read-only config inspection (opencode.json, opencode.jsonc, global config.json), @latest-aware name matching
 - Logging: client.app.log()
 - Install location: ~/.cache/opencode/packages/<spec>/node_modules/<package>
 </plugin_architecture>
 <asset_installation>
-Source: assets/ (published in package)
+Source: skills/ and commands/ at the package root (published in package)
 Target: <configBase>/skills/intellisearch/ and <configBase>/commands/search-intelligently.md
 Consumer-modified files are skipped with a warning unless --force is used
 </asset_installation>

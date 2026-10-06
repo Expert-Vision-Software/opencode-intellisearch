@@ -44,10 +44,16 @@ export interface InstallResult {
   clearedCache: string[];
 }
 
+export interface UninstallOptions {
+  purgeConfig: boolean;
+}
+
 export interface UninstallResult {
   scope: Scope;
   removed: string[];
   pluginRemoved: boolean;
+  permissionRemoved: boolean;
+  mcpRemoved: boolean;
 }
 
 export interface EnsureAssetsResult {
@@ -72,6 +78,7 @@ export interface StatusResult {
 
 const MCP_SERVER_NAME = "deepwiki";
 const MCP_SERVER_URL = "https://mcp.deepwiki.com/mcp";
+const ASSET_LAYOUT_DIR = ".";
 
 const editor = new JsonSpliceEditor();
 
@@ -183,9 +190,10 @@ export async function collectAssetFiles(
   packageName: string,
   packageVersion: string
 ): Promise<PlannedAssetFile[]> {
+  const layoutRoot = join(packageDir, ASSET_LAYOUT_DIR);
   const planned: PlannedAssetFile[] = [];
-  planned.push(...(await collectSkillFiles(join(packageDir, "assets", "skills"), packageName, packageVersion)));
-  planned.push(...(await collectCommandFiles(join(packageDir, "assets", "commands"), packageName, packageVersion)));
+  planned.push(...(await collectSkillFiles(join(layoutRoot, "skills"), packageName, packageVersion)));
+  planned.push(...(await collectCommandFiles(join(layoutRoot, "commands"), packageName, packageVersion)));
   return planned;
 }
 
@@ -416,6 +424,50 @@ async function removePluginFromConfig(configPath: string, packageName: string): 
   return true;
 }
 
+async function removeSkillPermissionFromConfig(configPath: string, packageName: string): Promise<boolean> {
+  const text = await readConfigText(configPath);
+  if (text === null) {
+    return false;
+  }
+  const config = parseConfigTextLenient(text);
+  if (config === null) {
+    warnUnparseableConfig(configPath, packageName, "uninstall");
+    return false;
+  }
+  if (!hasSkillIntellisearchEntry(config)) {
+    return false;
+  }
+  const spliced = editor.removeObjectEntry(text, ["permission", "skill", "intellisearch"], true);
+  if (spliced === null) {
+    warnUnspliceableConfig(configPath, packageName, "uninstall");
+    return false;
+  }
+  await writeSplicedConfig(configPath, spliced);
+  return true;
+}
+
+async function removeMcpServerFromConfig(configPath: string, packageName: string): Promise<boolean> {
+  const text = await readConfigText(configPath);
+  if (text === null) {
+    return false;
+  }
+  const config = parseConfigTextLenient(text);
+  if (config === null) {
+    warnUnparseableConfig(configPath, packageName, "uninstall");
+    return false;
+  }
+  if (!hasManagedMcpServerEntry(config)) {
+    return false;
+  }
+  const spliced = editor.removeObjectEntry(text, ["mcp", MCP_SERVER_NAME], true);
+  if (spliced === null) {
+    warnUnspliceableConfig(configPath, packageName, "uninstall");
+    return false;
+  }
+  await writeSplicedConfig(configPath, spliced);
+  return true;
+}
+
 function permissionAllowValue(config: Record<string, unknown>): string | null {
   const permission = config["permission"];
   if (typeof permission !== "object" || permission === null) {
@@ -427,6 +479,26 @@ function permissionAllowValue(config: Record<string, unknown>): string | null {
   }
   const value = (skill as Record<string, unknown>)["intellisearch"];
   return typeof value === "string" ? value : null;
+}
+
+function hasSkillIntellisearchEntry(config: Record<string, unknown>): boolean {
+  const permission = config["permission"];
+  if (typeof permission !== "object" || permission === null) {
+    return false;
+  }
+  const skill = (permission as Record<string, unknown>)["skill"];
+  if (typeof skill !== "object" || skill === null) {
+    return false;
+  }
+  return "intellisearch" in (skill as Record<string, unknown>);
+}
+
+function hasManagedMcpServerEntry(config: Record<string, unknown>): boolean {
+  const mcp = config["mcp"];
+  if (typeof mcp !== "object" || mcp === null) {
+    return false;
+  }
+  return MCP_SERVER_NAME in (mcp as Record<string, unknown>);
 }
 
 async function ensureSkillPermission(configPath: string, packageName: string): Promise<boolean> {
@@ -801,7 +873,8 @@ async function removeEmptiedManifestDirs(
 
 export async function uninstall(
   scope: Scope,
-  projectDir: string = process.cwd()
+  projectDir: string = process.cwd(),
+  options: UninstallOptions = { purgeConfig: false }
 ): Promise<UninstallResult> {
   const packageName = await getPackageName();
 
@@ -827,11 +900,17 @@ export async function uninstall(
   }
 
   let pluginRemoved = false;
+  let permissionRemoved = false;
+  let mcpRemoved = false;
   if (await exists(configPath)) {
     pluginRemoved = await removePluginFromConfig(configPath, packageName);
+    if (options.purgeConfig) {
+      permissionRemoved = await removeSkillPermissionFromConfig(configPath, packageName);
+      mcpRemoved = await removeMcpServerFromConfig(configPath, packageName);
+    }
   }
 
-  return { scope, removed, pluginRemoved };
+  return { scope, removed, pluginRemoved, permissionRemoved, mcpRemoved };
 }
 
 export async function status(projectDir: string = process.cwd()): Promise<StatusResult> {

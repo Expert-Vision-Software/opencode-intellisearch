@@ -200,6 +200,56 @@ describe("RegistrationDetector.detect", () => {
     });
   });
 
+  test("an unparseable legacy global config.json still warns when a global json registration already decided the result", async () => {
+    await withGlobalSandbox(async () => {
+      await resetGlobalConfig();
+      await writeGlobalPluginConfig([PACKAGE_NAME]);
+      const legacyPath = join(SANDBOX_GLOBAL_BASE, "config.json");
+      const brokenContent = '{\n  "plugin": ["opencode-architect"],\n  "model": ,\n}';
+      await writeFile(legacyPath, brokenContent);
+      const fixtureDir = await makeFixture("global-json-decides-legacy-broken");
+
+      const warnings: string[] = [];
+      const originalWarn = console.warn;
+      console.warn = (message: unknown) => {
+        warnings.push(String(message));
+      };
+      try {
+        await expectContext(fixtureDir, "global");
+      } finally {
+        console.warn = originalWarn;
+      }
+
+      expect(await readFile(legacyPath, "utf-8")).toBe(brokenContent);
+      expect(warnings.join("\n")).toContain(legacyPath);
+    });
+  });
+
+  test("an unparseable repo-root opencode.json still warns when the nested config already decided repo-local", async () => {
+    await withGlobalSandbox(async () => {
+      await resetGlobalConfig();
+      const fixtureDir = await makeFixture("repo-nested-decides-root-broken");
+      await writeNestedRepoConfig(fixtureDir, [PACKAGE_NAME]);
+      const brokenRootPath = join(fixtureDir, "opencode.json");
+      const brokenContent = '{\n  "plugin": ["opencode-architect"],\n  "model": ,\n}';
+      await writeFile(brokenRootPath, brokenContent);
+
+      const warnings: string[] = [];
+      const originalWarn = console.warn;
+      console.warn = (message: unknown) => {
+        warnings.push(String(message));
+      };
+      try {
+        await expectContext(fixtureDir, "repo-local");
+      } finally {
+        console.warn = originalWarn;
+      }
+
+      expect(await readFile(brokenRootPath, "utf-8")).toBe(brokenContent);
+      expect(warnings.join("\n")).toContain(brokenRootPath);
+    });
+  });
+
   test("an unparseable jsonc candidate warns and never masks a registration elsewhere", async () => {
     await withGlobalSandbox(async () => {
       await resetGlobalConfig();

@@ -78,6 +78,98 @@ export class JsonSpliceEditor {
     return this.validated(current, lenient);
   }
 
+  removeObjectEntry(text: string, path: string[], lenient: boolean): string | null {
+    const navigable = JsoncReader.toStrictText(text);
+    const root = this.rootObjectBounds(navigable);
+    if (root === null) return null;
+    const target = this.findEntryAlongPath(navigable, root, path);
+    if (target === null) return null;
+    const spanEnd = this.removalSpanEnd(text, target.valueStart);
+    const spanStart = this.removalSpanStart(text, target.entryStart, spanEnd);
+    return this.validated(text.slice(0, spanStart) + text.slice(spanEnd), lenient);
+  }
+
+  private findEntryAlongPath(
+    navigable: string,
+    bounds: ObjectBounds,
+    path: string[]
+  ): ObjectEntryLocation | null {
+    const head = path[0];
+    if (head === undefined) return null;
+    const entries = this.objectEntries(navigable, bounds);
+    if (entries === null) return null;
+    const entry = entries.find(candidate => candidate.key === head);
+    if (!entry) return null;
+    const rest = path.slice(1);
+    if (rest.length === 0) return entry;
+    const nestedBounds = this.objectValueBounds(navigable, entry);
+    if (nestedBounds === null) return null;
+    return this.findEntryAlongPath(navigable, nestedBounds, rest);
+  }
+
+  private removalSpanEnd(text: string, valueStart: number): number {
+    let inString = false;
+    let depth = 0;
+    let i = valueStart;
+    while (i < text.length) {
+      const current = text[i] ?? "";
+      if (inString) {
+        if (current === "\\") {
+          i += 2;
+          continue;
+        }
+        if (current === '"') inString = false;
+        i++;
+        continue;
+      }
+      if (current === '"') {
+        inString = true;
+        i++;
+        continue;
+      }
+      if (current === "/") {
+        const advanced = this.skipComment(text, i);
+        if (advanced !== null) {
+          i = advanced;
+          continue;
+        }
+      }
+      if (depth === 0 && current === ",") return i + 1;
+      if (depth === 0 && (current === "}" || current === "]")) return i;
+      if (current === "{" || current === "[") depth++;
+      if (current === "}" || current === "]") depth--;
+      i++;
+    }
+    return text.length;
+  }
+
+  private skipComment(text: string, slashIndex: number): number | null {
+    const next = text[slashIndex + 1] ?? "";
+    if (next === "/") {
+      let i = slashIndex;
+      while (i < text.length && text[i] !== "\n") i++;
+      return i;
+    }
+    if (next === "*") {
+      let i = slashIndex + 2;
+      while (i < text.length && !((text[i] ?? "") === "*" && (text[i + 1] ?? "") === "/")) i++;
+      return i + 2;
+    }
+    return null;
+  }
+
+  private removalSpanStart(text: string, entryStart: number, spanEnd: number): number {
+    if ((text[spanEnd - 1] ?? "") === ",") {
+      return entryStart;
+    }
+    let cursor = entryStart;
+    while (cursor > 0 && /\s/.test(text[cursor - 1] ?? "")) cursor--;
+    if ((text[cursor - 1] ?? "") === ",") {
+      return cursor - 1;
+    }
+    return entryStart;
+  }
+
   private buildEntryChain(
     text: string,
     navigable: string,

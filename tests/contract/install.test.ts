@@ -289,9 +289,8 @@ describe("loud asset absence", () => {
   test("missing commands asset directory fails loudly while skills exists", async () => {
     const fixtureDir = await makeFixture("missing-commands");
     const fakePackageDir = join(fixtureDir, "package");
-    await mkdir(join(fakePackageDir, "assets", "skills", "intellisearch"), { recursive: true });
-    await writeFile(join(fakePackageDir, "assets", "skills", "intellisearch", "SKILL.md"), "payload");
-    await mkdir(join(fakePackageDir, "assets"), { recursive: true });
+    await mkdir(join(fakePackageDir, "skills", "intellisearch"), { recursive: true });
+    await writeFile(join(fakePackageDir, "skills", "intellisearch", "SKILL.md"), "payload");
 
     let thrown: unknown = null;
     try {
@@ -302,7 +301,7 @@ describe("loud asset absence", () => {
 
     expect(thrown).toBeInstanceOf(Error);
     const message = (thrown as Error).message;
-    expect(message).toContain(join(fakePackageDir, "assets", "commands"));
+    expect(message).toContain(join(fakePackageDir, "commands"));
     expect(message).toContain(PACKAGE_NAME);
     expect(message).toContain("clear-cache");
     expect(message).toContain("install --scope global");
@@ -311,9 +310,9 @@ describe("loud asset absence", () => {
   test("empty skills asset directory fails loudly", async () => {
     const fixtureDir = await makeFixture("empty-skills");
     const fakePackageDir = join(fixtureDir, "package");
-    await mkdir(join(fakePackageDir, "assets", "skills"), { recursive: true });
-    await mkdir(join(fakePackageDir, "assets", "commands"), { recursive: true });
-    await writeFile(join(fakePackageDir, "assets", "commands", "search-intelligently.md"), "payload");
+    await mkdir(join(fakePackageDir, "skills"), { recursive: true });
+    await mkdir(join(fakePackageDir, "commands"), { recursive: true });
+    await writeFile(join(fakePackageDir, "commands", "search-intelligently.md"), "payload");
 
     expect(collectAssetFiles(fakePackageDir, PACKAGE_NAME, "0.0.0-test")).rejects.toThrow(PACKAGE_NAME);
   });
