@@ -113,7 +113,7 @@ jobs:
 
       - name: Verify tarball contents
         run: |
-          bun pm pack --dry-run --json > tarball.json
+          npm pack --dry-run --json > tarball.json
           node -e "
             const fs = require('fs');
             const expected = ['index.ts', 'src', 'skills', 'commands', 'README.md', 'LICENSE', 'AGENTS.md'];
