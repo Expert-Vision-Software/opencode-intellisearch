@@ -5,6 +5,16 @@ All notable changes to the intellisearch extension for OpenCode will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.1] - 2026-10-11
+
+### Changed
+- Config pipeline emits v2-native keys: plugin registration is written to the `plugins` array, the DeepWiki MCP server to `mcp.servers.deepwiki` (`{ type, url }`, no `enabled`), with detection and uninstall still honoring the legacy v1 `plugin` / `mcp.<name>` spellings for backward compatibility
+- The v1 skill permission (`permission.skill.intellisearch`) is no longer written: the v2 config policy has no skill action. `uninstall --purge-config` still removes it as legacy cleanup; the interactive install prompt for it is gone
+- Docs (README, INSTALLATION, CONTRIBUTING) and AGENTS.md updated to v2 config snippets and the console.warn logging reality
+
+### Fixed
+- Stray `EOF` artifact removed from the 0.7.1 changelog section
+
 ## [0.8.0] - 2026-10-11
 
 ### Changed
@@ -17,8 +27,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Project `.opencode/opencode.json` migrated to v2-native `permissions` ruleset (`tool.use` / resource / effect) from the v1 `permission` key map
 
 ## [0.7.1] - 2026-10-06
-EOF
-
 
 ### Added
 - `clear-cache` CLI subcommand (self-scoped only) plus best-effort pruning of this package's own cache copies on every install

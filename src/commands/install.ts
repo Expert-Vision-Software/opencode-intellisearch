@@ -6,7 +6,7 @@ import {
   type InstallOptions,
   type Scope,
 } from "../installer.ts";
-import { confirmOverwrite, confirmPermissionConfig, confirmMcpConfig } from "../prompts.ts";
+import { confirmOverwrite, confirmMcpConfig } from "../prompts.ts";
 
 interface InstallCommandOptions {
   scope: Scope | null;
@@ -61,14 +61,12 @@ export async function installCommand(options: InstallCommandOptions): Promise<vo
   const installOptions: InstallOptions = {
     mode: options.mode ?? "plugin",
     addPluginConfig: true,
-    configurePermission: true,
     configureMcp: true,
     migrateRootConfig: options.migrate === true,
     force: options.force === true,
   };
 
   if (!options.scope) {
-    installOptions.configurePermission = await confirmPermissionConfig();
     installOptions.configureMcp = await confirmMcpConfig();
   }
 
@@ -99,10 +97,6 @@ export async function installCommand(options: InstallCommandOptions): Promise<vo
 
   if (result.pluginAdded) {
     console.log(`  Plugin: added to config`);
-  }
-
-  if (result.permissionConfigured) {
-    console.log(`  Permission: skill.intellisearch = "allow"`);
   }
 
   if (result.mcpConfigured) {

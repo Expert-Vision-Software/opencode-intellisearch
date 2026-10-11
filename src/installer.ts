@@ -17,7 +17,6 @@ export interface InstallOptions {
   addPluginConfig: boolean;
   migrateRootConfig: boolean;
   force: boolean;
-  configurePermission: boolean;
   configureMcp: boolean;
 }
 
@@ -38,7 +37,6 @@ export interface InstallResult {
   skipped: string[];
   migrated: boolean;
   pluginAdded: boolean;
-  permissionConfigured: boolean;
   mcpConfigured: boolean;
   recommendations: string[];
   clearedCache: string[];
@@ -344,7 +342,11 @@ async function writeCreatedConfig(configPath: string, content: string): Promise<
 }
 
 function pluginArrayContains(config: Record<string, unknown>, packageName: string): boolean {
-  const plugins = config["plugin"];
+  return pluginKeyArrayContains(config, "plugins", packageName) || pluginKeyArrayContains(config, "plugin", packageName);
+}
+
+function pluginKeyArrayContains(config: Record<string, unknown>, key: string, packageName: string): boolean {
+  const plugins = config[key];
   if (!Array.isArray(plugins)) {
     return false;
   }
@@ -374,7 +376,7 @@ async function addPluginToConfig(configPath: string, packageName: string): Promi
   const canonical = PluginNameNormalizer.canonicalize(packageName);
   const text = await readConfigText(configPath);
   if (text === null) {
-    await writeCreatedConfig(configPath, `{\n  "plugin": ["${canonical}"]\n}\n`);
+    await writeCreatedConfig(configPath, `{\n  "plugins": [ "${canonical}" ]\n}\n`);
     return true;
   }
   const config = parseConfigTextLenient(text);
@@ -382,13 +384,13 @@ async function addPluginToConfig(configPath: string, packageName: string): Promi
     warnUnparseableConfig(configPath, packageName, "install");
     return false;
   }
-  if (pluginArrayContains(config, packageName)) {
+  if (pluginKeyArrayContains(config, "plugins", packageName)) {
     return false;
   }
-  const hasPluginKey = "plugin" in config;
-  const spliced = hasPluginKey
-    ? editor.addArrayElement(text, "plugin", `"${canonical}"`, true)
-    : editor.setObjectEntry(text, ["plugin"], `["${canonical}"]`, true);
+  const hasPluginsKey = "plugins" in config;
+  const spliced = hasPluginsKey
+    ? editor.addArrayElement(text, "plugins", `"${canonical}"`, true)
+    : editor.setObjectEntry(text, ["plugins"], `[ "${canonical}" ]`, true);
   if (spliced === null) {
     warnUnspliceableConfig(configPath, packageName, "install");
     return false;
@@ -410,14 +412,37 @@ async function removePluginFromConfig(configPath: string, packageName: string): 
   if (!pluginArrayContains(config, packageName)) {
     return false;
   }
-  const spliced = editor.removeArrayElements(
-    text,
-    "plugin",
-    entry => PluginNameNormalizer.matches(entry, packageName),
-    true
-  );
-  if (spliced === null) {
-    warnUnspliceableConfig(configPath, packageName, "uninstall");
+  let spliced = text;
+  let removed = false;
+  if (pluginKeyArrayContains(config, "plugins", packageName)) {
+    const v2Spliced = editor.removeArrayElements(
+      text,
+      "plugins",
+      entry => PluginNameNormalizer.matches(entry, packageName),
+      true
+    );
+    if (v2Spliced === null) {
+      warnUnspliceableConfig(configPath, packageName, "uninstall");
+      return false;
+    }
+    removed = v2Spliced !== text;
+    spliced = v2Spliced;
+  }
+  if (pluginKeyArrayContains(config, "plugin", packageName)) {
+    const legacySpliced = editor.removeArrayElements(
+      spliced,
+      "plugin",
+      entry => PluginNameNormalizer.matches(entry, packageName),
+      true
+    );
+    if (legacySpliced === null) {
+      warnUnspliceableConfig(configPath, packageName, "uninstall");
+      return false;
+    }
+    removed = removed || legacySpliced !== spliced;
+    spliced = legacySpliced;
+  }
+  if (!removed) {
     return false;
   }
   await writeSplicedConfig(configPath, spliced);
@@ -456,29 +481,31 @@ async function removeMcpServerFromConfig(configPath: string, packageName: string
     warnUnparseableConfig(configPath, packageName, "uninstall");
     return false;
   }
-  if (!hasManagedMcpServerEntry(config)) {
+  if (!hasManagedMcpServerEntry(config) && !hasLegacyMcpServerEntry(config)) {
     return false;
   }
-  const spliced = editor.removeObjectEntry(text, ["mcp", MCP_SERVER_NAME], true);
-  if (spliced === null) {
-    warnUnspliceableConfig(configPath, packageName, "uninstall");
+  let spliced = text;
+  if (mcpServersRecord(config, servers => MCP_SERVER_NAME in servers)) {
+    const v2Spliced = editor.removeObjectEntry(text, ["mcp", "servers", MCP_SERVER_NAME], true);
+    if (v2Spliced === null) {
+      warnUnspliceableConfig(configPath, packageName, "uninstall");
+      return false;
+    }
+    spliced = v2Spliced;
+  }
+  if (hasLegacyMcpServerEntry(config)) {
+    const legacySpliced = editor.removeObjectEntry(spliced, ["mcp", MCP_SERVER_NAME], true);
+    if (legacySpliced === null) {
+      warnUnspliceableConfig(configPath, packageName, "uninstall");
+      return false;
+    }
+    spliced = legacySpliced;
+  }
+  if (spliced === text) {
     return false;
   }
   await writeSplicedConfig(configPath, spliced);
   return true;
-}
-
-function permissionAllowValue(config: Record<string, unknown>): string | null {
-  const permission = config["permission"];
-  if (typeof permission !== "object" || permission === null) {
-    return null;
-  }
-  const skill = (permission as Record<string, unknown>)["skill"];
-  if (typeof skill !== "object" || skill === null) {
-    return null;
-  }
-  const value = (skill as Record<string, unknown>)["intellisearch"];
-  return typeof value === "string" ? value : null;
 }
 
 function hasSkillIntellisearchEntry(config: Record<string, unknown>): boolean {
@@ -494,6 +521,25 @@ function hasSkillIntellisearchEntry(config: Record<string, unknown>): boolean {
 }
 
 function hasManagedMcpServerEntry(config: Record<string, unknown>): boolean {
+  return mcpServersRecord(config, servers => MCP_SERVER_NAME in servers);
+}
+
+function mcpServersRecord(
+  config: Record<string, unknown>,
+  check: (servers: Record<string, unknown>) => boolean
+): boolean {
+  const mcp = config["mcp"];
+  if (typeof mcp !== "object" || mcp === null) {
+    return false;
+  }
+  const servers = (mcp as Record<string, unknown>)["servers"];
+  if (typeof servers !== "object" || servers === null) {
+    return false;
+  }
+  return check(servers as Record<string, unknown>);
+}
+
+function hasLegacyMcpServerEntry(config: Record<string, unknown>): boolean {
   const mcp = config["mcp"];
   if (typeof mcp !== "object" || mcp === null) {
     return false;
@@ -501,48 +547,29 @@ function hasManagedMcpServerEntry(config: Record<string, unknown>): boolean {
   return MCP_SERVER_NAME in (mcp as Record<string, unknown>);
 }
 
-async function ensureSkillPermission(configPath: string, packageName: string): Promise<boolean> {
-  const text = await readConfigText(configPath);
-  if (text === null) {
-    await writeCreatedConfig(
-      configPath,
-      `{\n  "permission": {\n    "skill": {\n      "intellisearch": "allow"\n    }\n  }\n}\n`
-    );
-    return true;
-  }
-  const config = parseConfigTextLenient(text);
-  if (config === null) {
-    warnUnparseableConfig(configPath, packageName, "install");
-    return false;
-  }
-  if (permissionAllowValue(config) === "allow") {
-    return false;
-  }
-  const spliced = editor.setObjectEntry(text, ["permission", "skill", "intellisearch"], `"allow"`, true);
-  if (spliced === null) {
-    warnUnspliceableConfig(configPath, packageName, "install");
-    return false;
-  }
-  await writeSplicedConfig(configPath, spliced);
-  return true;
+function hasDeepWikiServer(config: Record<string, unknown>): boolean {
+  const lowerName = MCP_SERVER_NAME.toLowerCase();
+  return (
+    mcpServersRecord(config, servers => Object.keys(servers).some(key => key.toLowerCase() === lowerName)) ||
+    legacyMcpNames(config).some(key => key.toLowerCase() === lowerName)
+  );
 }
 
-function hasDeepWikiServer(config: Record<string, unknown>): boolean {
+function legacyMcpNames(config: Record<string, unknown>): string[] {
   const mcp = config["mcp"];
   if (typeof mcp !== "object" || mcp === null) {
-    return false;
+    return [];
   }
-  const lowerName = MCP_SERVER_NAME.toLowerCase();
-  return Object.keys(mcp as Record<string, unknown>).some(key => key.toLowerCase() === lowerName);
+  return Object.keys(mcp as Record<string, unknown>);
 }
 
 async function addMcpServer(configPath: string, packageName: string): Promise<boolean> {
   const text = await readConfigText(configPath);
-  const serverBody = JSON.stringify({ type: "remote", url: MCP_SERVER_URL, enabled: true });
+  const serverBody = JSON.stringify({ type: "remote", url: MCP_SERVER_URL });
   if (text === null) {
     await writeCreatedConfig(
       configPath,
-      `{\n  "mcp": {\n    "${MCP_SERVER_NAME}": ${serverBody}\n  }\n}\n`
+      `{\n  "mcp": {\n    "servers": {\n      "${MCP_SERVER_NAME}": ${serverBody}\n    }\n  }\n}\n`
     );
     return true;
   }
@@ -554,7 +581,7 @@ async function addMcpServer(configPath: string, packageName: string): Promise<bo
   if (hasDeepWikiServer(config)) {
     return false;
   }
-  const spliced = editor.setObjectEntry(text, ["mcp", MCP_SERVER_NAME], serverBody, true);
+  const spliced = editor.setObjectEntry(text, ["mcp", "servers", MCP_SERVER_NAME], serverBody, true);
   if (spliced === null) {
     warnUnspliceableConfig(configPath, packageName, "install");
     return false;
@@ -782,11 +809,6 @@ async function applyInstall(
     pluginAdded = await addPluginToConfig(configPath, packageName);
   }
 
-  let permissionConfigured = false;
-  if (options.configurePermission) {
-    permissionConfigured = await ensureSkillPermission(configPath, packageName);
-  }
-
   let mcpConfigured = false;
   if (options.configureMcp) {
     mcpConfigured = await addMcpServer(configPath, packageName);
@@ -802,7 +824,6 @@ async function applyInstall(
     skipped,
     migrated,
     pluginAdded,
-    permissionConfigured,
     mcpConfigured,
     recommendations: [],
     clearedCache: [],
@@ -832,7 +853,6 @@ export async function ensureAssets(
     addPluginConfig: false,
     migrateRootConfig: false,
     force,
-    configurePermission: false,
     configureMcp: false,
   });
   return { skipped: result.skipped };

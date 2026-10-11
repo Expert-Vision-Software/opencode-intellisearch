@@ -171,11 +171,11 @@ Query GitHub repository documentation:
 <implementation_details>
 <plugin_architecture>
 - Export: index.ts re-exports the default plugin factory from src/plugin.ts (entry module default-only)
-- Config hook: runs once during OpenCode initialization; the entire hook body is wrapped in try/catch so OpenCode always launches
+- Load hook: runs in the plugin `effect` during OpenCode initialization; the entire body is guarded so OpenCode always launches
 - Assets: copied from the package-root skills/ and commands/ directories into each registered scope (.opencode/ locally, the global config dir globally)
 - Idempotency: manifest-gated via <configBase>/<package>.manifest.json recording version + per-file sha256 hashes; no .version markers
-- Registration detection: read-only config inspection (opencode.json, opencode.jsonc, global config.json), @latest-aware name matching
-- Logging: client.app.log()
+- Registration detection: read-only config inspection (opencode.json, opencode.jsonc, global config.json), @latest-aware name matching across both the v2 `plugins` key and the legacy v1 `plugin` key
+- Logging: console.warn with a `[opencode-intellisearch]` prefix (the v2 effect context exposes no client logger)
 - Install location: ~/.cache/opencode/packages/<spec>/node_modules/<package>
 </plugin_architecture>
 <asset_installation>
@@ -184,9 +184,11 @@ Target: <configBase>/skills/intellisearch/ and <configBase>/commands/search-inte
 Consumer-modified files are skipped with a warning unless --force is used
 </asset_installation>
 <config_modification>
-- Permission (skill.intellisearch: "allow"), MCP (deepwiki), plugin registration, and root-config migration are CLI-only (--migrate gates migration, default false)
-- The load hook never edits plugin arrays, permissions, or MCP config; it only ensures payload assets in registered scopes
-- Registration writes are surgical text splices into the plugin array (indentation, comments, and unrelated keys preserved)
+- MCP (deepwiki under mcp.servers) and plugin registration (v2 `plugins` array) are CLI install/uninstall writes; the legacy v1 `plugin` and `mcp.<name>` spellings are still detected and removed for backward compatibility
+- The v1 skill permission (`permission.skill.intellisearch`) is no longer written: v2 config policy has no skill action. Uninstall --purge-config still removes it as legacy cleanup
+- Root-config migration is CLI-only (--migrate gates migration, default false)
+- The load hook never edits plugin arrays or MCP config; it only ensures payload assets in registered scopes
+- Registration writes are surgical text splices preserving indentation, comments, and unrelated keys
 </config_modification>
 </implementation_details>
 

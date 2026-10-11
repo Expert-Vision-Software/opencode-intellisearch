@@ -38,7 +38,7 @@ export async function uninstallCommand(options: UninstallOptions): Promise<void>
     }
     if (options.purgeConfig) {
       const shouldPurge = await confirmOverwrite(
-        `Also remove the ${packageName} plugin entry, skill.intellisearch permission, and deepwiki MCP server from the config?`
+        `Also remove the ${packageName} plugins entry, any legacy skill.intellisearch permission, and the deepwiki MCP server from the config?`
       );
       if (!shouldPurge) {
         options.purgeConfig = false;
@@ -60,7 +60,7 @@ export async function uninstallCommand(options: UninstallOptions): Promise<void>
     console.log(`  Plugin: removed from config`);
   }
   if (result.permissionRemoved) {
-    console.log(`  Permission: skill.intellisearch removed from config`);
+    console.log(`  Permission: legacy skill.intellisearch entry removed from config`);
   }
   if (result.mcpRemoved) {
     console.log(`  MCP: deepwiki server removed from config`);

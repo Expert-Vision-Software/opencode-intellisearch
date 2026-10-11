@@ -50,9 +50,8 @@ bunx opencode-intellisearch install --scope global --force
 
 The installer will:
 - Copy skill and command files to `.opencode/`
-- Configure skill permission (`permission.skill.intellisearch: "allow"`)
-- Add MCP server configuration (deepwiki)
-- Add plugin to opencode.json
+- Add MCP server configuration (`mcp.servers.deepwiki`)
+- Add the plugin to the `plugins` array in opencode.json
 
 ### Option 2: npm/bun Package
 
@@ -71,10 +70,13 @@ Then add to your `opencode.json`:
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["opencode-intellisearch@latest"],
+  "plugins": ["opencode-intellisearch@latest"],
   "mcp": {
-    "deepwiki": {
-      "url": "https://mcp.deepwiki.com/mcp"
+    "servers": {
+      "deepwiki": {
+        "type": "remote",
+        "url": "https://mcp.deepwiki.com/mcp"
+      }
     }
   }
 }
@@ -104,7 +106,7 @@ Or use path-based plugin loading in `opencode.json`:
 
 ```json
 {
-  "plugin": ["file:///C:/dev/projects/github/opencode-intellisearch"]
+  "plugins": ["file:///C:/dev/projects/github/opencode-intellisearch"]
 }
 ```
 
@@ -116,8 +118,11 @@ Configure in `~/.config/opencode/opencode.json` or project `opencode.json`:
 {
   "$schema": "https://opencode.ai/config.json",
   "mcp": {
-    "deepwiki": {
-      "url": "https://mcp.deepwiki.com/mcp"
+    "servers": {
+      "deepwiki": {
+        "type": "remote",
+        "url": "https://mcp.deepwiki.com/mcp"
+      }
     }
   }
 }
@@ -179,14 +184,15 @@ bunx opencode-intellisearch uninstall --scope local --purge-config
 ```
 
 By default, uninstall is conservative: it removes the manifest-recorded skill and command
-files and the `opencode-intellisearch` entry from the `plugin` array, leaving an empty
-`"plugin": []` behind (the documented manual state). The `permission.skill.intellisearch`
-permission and the `deepwiki` MCP server entry are left untouched since they may hold
-consumer edits.
+files and the `opencode-intellisearch` entry from the `plugins` array, leaving an empty
+`"plugins": []` behind (the documented manual state). The `deepwiki` MCP server entry is
+left untouched since it may hold consumer edits. A legacy v1 `permission.skill.intellisearch`
+entry (written by pre-v2 installs) is also left untouched.
 
 Pass `--purge-config` to also remove those package-managed config entries: the
-`opencode-intellisearch` plugin entry, `permission.skill.intellisearch`, and the
-`mcp.deepwiki` server. Unrelated keys (other plugins, other permissions, other MCP
+`opencode-intellisearch` plugins entry, any legacy `permission.skill.intellisearch`
+entry, and the `mcp.servers.deepwiki` server (plus its legacy v1 `mcp.deepwiki`
+spelling). Unrelated keys (other plugins, other permissions, other MCP
 servers, comments, formatting) are never touched, and a config file that fails to parse
 is preserved byte-for-byte.
 
@@ -196,7 +202,7 @@ Remove from `opencode.json`:
 
 ```json
 {
-  "plugin": []
+  "plugins": []
 }
 ```
 

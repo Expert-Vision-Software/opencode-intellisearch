@@ -189,8 +189,11 @@ The installer automatically configures the deepwiki MCP server. For manual setup
 ```json
 {
   "mcp": {
-    "deepwiki": {
-      "url": "https://mcp.deepwiki.com/mcp"
+    "servers": {
+      "deepwiki": {
+        "type": "remote",
+        "url": "https://mcp.deepwiki.com/mcp"
+      }
     }
   }
 }

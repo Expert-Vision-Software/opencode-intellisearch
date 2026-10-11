@@ -39,7 +39,7 @@ async function readLocalConfigRaw(fixtureDir: string): Promise<string> {
 
 async function readPluginArray(fixtureDir: string): Promise<string[]> {
   const config = JSON.parse(await readLocalConfigRaw(fixtureDir)) as Record<string, unknown>;
-  return (config["plugin"] as string[]) ?? [];
+  return (config["plugins"] as string[]) ?? (config["plugin"] as string[]) ?? [];
 }
 
 async function captureWarnings(operation: () => Promise<void>): Promise<string[]> {
@@ -61,7 +61,6 @@ const INSTALL_OPTIONS: InstallOptions = {
   addPluginConfig: false,
   migrateRootConfig: false,
   force: false,
-  configurePermission: false,
   configureMcp: false,
 };
 
@@ -109,7 +108,6 @@ describe("surgical config writes", () => {
       addPluginConfig: true,
       migrateRootConfig: false,
       force: false,
-      configurePermission: false,
       configureMcp: false,
     });
 
@@ -117,7 +115,7 @@ describe("surgical config writes", () => {
     const after = await readLocalConfigRaw(fixtureDir);
     const expected =
       "{\n" +
-      `    "plugin": ["${CANONICAL_PLUGIN_REF}"],\n` +
+      `    "plugins": [ "${CANONICAL_PLUGIN_REF}" ],\n` +
       '    "$schema": "https://opencode.ai/config.json",\n' +
       "    // my preferred model\n" +
       '    "model": "some/model"\n' +
@@ -143,7 +141,6 @@ describe("surgical config writes", () => {
       addPluginConfig: true,
       migrateRootConfig: false,
       force: false,
-      configurePermission: false,
       configureMcp: false,
     });
 
@@ -151,13 +148,13 @@ describe("surgical config writes", () => {
     const after = await readFile(configPath, "utf-8");
     expect(after).toContain("// my config");
     expect(after).toContain("// inline comment");
-    expect(after).toContain(`"plugin": ["${CANONICAL_PLUGIN_REF}"],`);
+    expect(after).toContain(`"plugins": [ "${CANONICAL_PLUGIN_REF}" ],`);
     const parsed = JsoncReader.parse(after) as Record<string, unknown>;
-    expect(parsed["plugin"]).toEqual([CANONICAL_PLUGIN_REF]);
+    expect(parsed["plugins"]).toEqual([CANONICAL_PLUGIN_REF]);
     expect(parsed["model"]).toBe("some/model");
   });
 
-  test("permission splice into an existing config preserves unrelated keys and formatting", async () => {
+  test("install writes no v1 permission key (v2 skills are not permission-gated)", async () => {
     const fixtureDir = await makeFixture("splice-permission");
     const localDir = join(fixtureDir, ".opencode");
     await mkdir(localDir, { recursive: true });
@@ -169,21 +166,16 @@ describe("surgical config writes", () => {
       "}";
     await writeFile(join(localDir, "opencode.json"), before);
 
-    const result = await install("local", fixtureDir, {
+    await install("local", fixtureDir, {
       mode: "plugin",
       addPluginConfig: false,
       migrateRootConfig: false,
       force: false,
-      configurePermission: true,
       configureMcp: false,
     });
 
-    expect(result.permissionConfigured).toBe(true);
     const after = await readLocalConfigRaw(fixtureDir);
-    expect(after).toContain("// keep me");
-    expect(after).toContain('"model": "some/model"');
-    const parsed = JsoncReader.parse(after) as { permission?: { skill?: Record<string, string> } };
-    expect(parsed.permission?.skill?.["intellisearch"]).toBe("allow");
+    expect(after).toBe(before);
   });
 
   test("mcp splice into an existing config preserves unrelated keys and formatting", async () => {
@@ -203,15 +195,14 @@ describe("surgical config writes", () => {
       addPluginConfig: false,
       migrateRootConfig: false,
       force: false,
-      configurePermission: false,
       configureMcp: true,
     });
 
     expect(result.mcpConfigured).toBe(true);
     const after = await readLocalConfigRaw(fixtureDir);
     expect(after).toContain("/* block comment */");
-    const parsed = JsoncReader.parse(after) as { mcp?: Record<string, unknown> };
-    const server = parsed.mcp?.["deepwiki"] as { url?: string };
+    const parsed = JsoncReader.parse(after) as { mcp?: { servers?: Record<string, unknown> } };
+    const server = parsed.mcp?.servers?.["deepwiki"] as { url?: string };
     expect(server?.url).toBe("https://mcp.deepwiki.com/mcp");
   });
 });
@@ -232,7 +223,6 @@ describe("config writes over unparseable JSON", () => {
         addPluginConfig: true,
         migrateRootConfig: false,
         force: false,
-        configurePermission: false,
         configureMcp: false,
       });
       pluginAdded = result.pluginAdded;
@@ -257,14 +247,13 @@ describe("config writes over unparseable JSON", () => {
       addPluginConfig: true,
       migrateRootConfig: false,
       force: false,
-      configurePermission: false,
       configureMcp: false,
     });
 
     expect(result.pluginAdded).toBe(true);
     const after = await readLocalConfigRaw(fixtureDir);
     expect(after).toBe(
-      '{\n  "$schema": "https://opencode.ai/config.json",\n  "plugin": [\n    "opencode-intellisearch@latest",\n    "opencode-architect"\n  ],\n}'
+      '{\n  "plugins": [ "opencode-intellisearch@latest" ],\n  "$schema": "https://opencode.ai/config.json",\n  "plugin": [\n    "opencode-architect"\n  ],\n}'
     );
   });
 
@@ -326,7 +315,6 @@ describe("canonical plugin references", () => {
       addPluginConfig: true,
       migrateRootConfig: false,
       force: false,
-      configurePermission: false,
       configureMcp: false,
     });
 
@@ -335,7 +323,7 @@ describe("canonical plugin references", () => {
     expect(plugins).toEqual([CANONICAL_PLUGIN_REF]);
   });
 
-  test("install does not append a duplicate when a bare name is already present", async () => {
+  test("install migrates a legacy bare-name plugin entry by adding the v2 plugins key", async () => {
     const fixtureDir = await makeFixture("dedup-bare-name");
     await writeLocalConfig(fixtureDir, {
       $schema: "https://opencode.ai/config.json",
@@ -347,15 +335,14 @@ describe("canonical plugin references", () => {
       addPluginConfig: true,
       migrateRootConfig: false,
       force: false,
-      configurePermission: false,
       configureMcp: false,
     });
 
-    expect(result.pluginAdded).toBe(false);
-    expect(await readPluginArray(fixtureDir)).toEqual([PACKAGE_NAME]);
+    expect(result.pluginAdded).toBe(true);
+    expect(await readPluginArray(fixtureDir)).toEqual([CANONICAL_PLUGIN_REF]);
   });
 
-  test("install does not append a duplicate when a pinned version is already present", async () => {
+  test("install migrates a legacy pinned plugin entry by adding the v2 plugins key", async () => {
     const fixtureDir = await makeFixture("dedup-pinned");
     await writeLocalConfig(fixtureDir, {
       $schema: "https://opencode.ai/config.json",
@@ -367,7 +354,44 @@ describe("canonical plugin references", () => {
       addPluginConfig: true,
       migrateRootConfig: false,
       force: false,
-      configurePermission: false,
+      configureMcp: false,
+    });
+
+    expect(result.pluginAdded).toBe(true);
+    expect(await readPluginArray(fixtureDir)).toEqual([CANONICAL_PLUGIN_REF]);
+  });
+
+  test("install does not append a duplicate when the v2 plugins key already has a bare name", async () => {
+    const fixtureDir = await makeFixture("dedup-v2-bare-name");
+    await writeLocalConfig(fixtureDir, {
+      $schema: "https://opencode.ai/config.json",
+      plugins: [PACKAGE_NAME],
+    });
+
+    const result = await install("local", fixtureDir, {
+      mode: "plugin",
+      addPluginConfig: true,
+      migrateRootConfig: false,
+      force: false,
+      configureMcp: false,
+    });
+
+    expect(result.pluginAdded).toBe(false);
+    expect(await readPluginArray(fixtureDir)).toEqual([PACKAGE_NAME]);
+  });
+
+  test("install does not append a duplicate when the v2 plugins key already has a pinned version", async () => {
+    const fixtureDir = await makeFixture("dedup-v2-pinned");
+    await writeLocalConfig(fixtureDir, {
+      $schema: "https://opencode.ai/config.json",
+      plugins: [`${PACKAGE_NAME}@0.2.0`],
+    });
+
+    const result = await install("local", fixtureDir, {
+      mode: "plugin",
+      addPluginConfig: true,
+      migrateRootConfig: false,
+      force: false,
       configureMcp: false,
     });
 
@@ -559,7 +583,7 @@ describe("root config migration guard", () => {
     expect(await exists(join(fixtureDir, "opencode.json"))).toBe(false);
     const migrated = JSON.parse(await readLocalConfigRaw(fixtureDir)) as Record<string, unknown>;
     expect(migrated["model"]).toBe("some/model");
-    expect(migrated["plugin"]).toEqual([CANONICAL_PLUGIN_REF]);
+    expect(migrated["plugins"]).toEqual([CANONICAL_PLUGIN_REF]);
   });
 
   test("migration merge preserves the dot config formatting and carries root-only keys", async () => {
@@ -592,48 +616,45 @@ describe("root config migration guard", () => {
 });
 
 describe("permission and MCP config (CLI-driven)", () => {
-  test("install configures the skill permission when requested", async () => {
+  test("install writes no permission key even when the plugin entry is added", async () => {
     const fixtureDir = await makeFixture("permission-cli");
-    const result = await install("local", fixtureDir, {
+    await install("local", fixtureDir, {
       mode: "plugin",
       addPluginConfig: true,
-      configurePermission: true,
       configureMcp: false,
       migrateRootConfig: false,
       force: false,
     });
 
-    expect(result.permissionConfigured).toBe(true);
     const config = JSON.parse(await readLocalConfigRaw(fixtureDir)) as Record<string, unknown>;
-    const permission = config["permission"] as { skill?: Record<string, string> };
-    expect(permission?.skill?.["intellisearch"]).toBe("allow");
+    expect(config["permission"]).toBeUndefined();
+    expect(config["permissions"]).toBeUndefined();
   });
 
-  test("install configures the DeepWiki MCP server when requested", async () => {
+  test("install configures the DeepWiki MCP server under mcp.servers when requested", async () => {
     const fixtureDir = await makeFixture("mcp-cli");
     const result = await install("local", fixtureDir, {
       mode: "plugin",
       addPluginConfig: true,
-      configurePermission: false,
       configureMcp: true,
       migrateRootConfig: false,
       force: false,
     });
 
     expect(result.mcpConfigured).toBe(true);
-    const config = JSON.parse(await readLocalConfigRaw(fixtureDir)) as Record<string, unknown>;
-    const mcp = config["mcp"] as Record<string, unknown>;
-    const server = mcp?.["deepwiki"] as { type?: string; url?: string; enabled?: boolean };
+    const config = JSON.parse(await readLocalConfigRaw(fixtureDir)) as {
+      mcp?: { servers?: Record<string, unknown> };
+    };
+    const server = config.mcp?.servers?.["deepwiki"] as { type?: string; url?: string; enabled?: boolean };
     expect(server?.type).toBe("remote");
     expect(server?.url).toBe("https://mcp.deepwiki.com/mcp");
-    expect(server?.enabled).toBe(true);
+    expect(server?.enabled).toBeUndefined();
   });
 
-  test("permission and MCP config are skipped when disabled", async () => {
+  test("MCP config is skipped when disabled", async () => {
     const fixtureDir = await makeFixture("config-disabled");
     const result = await install("local", fixtureDir, INSTALL_OPTIONS);
 
-    expect(result.permissionConfigured).toBe(false);
     expect(result.mcpConfigured).toBe(false);
     expect(await exists(join(fixtureDir, ".opencode", "opencode.json"))).toBe(false);
   });

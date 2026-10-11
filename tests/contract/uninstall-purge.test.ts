@@ -55,7 +55,7 @@ function fullManagedConfig(plugin: string[]): string {
     '  "$schema": "https://opencode.ai/config.json",\n' +
     "  // consumer comment stays\n" +
     '  "model": "some/model",\n' +
-    `  "plugin": ${JSON.stringify(plugin)},\n` +
+    `  "plugins": ${JSON.stringify(plugin)},\n` +
     '  "permission": {\n' +
     '    "skill": {\n' +
     '      "other-skill": "allow",\n' +
@@ -63,14 +63,15 @@ function fullManagedConfig(plugin: string[]): string {
     "    }\n" +
     "  },\n" +
     '  "mcp": {\n' +
-    '    "deepwiki": {\n' +
-    '      "type": "remote",\n' +
-    '      "url": "https://mcp.deepwiki.com/mcp",\n' +
-    '      "enabled": true\n' +
-    "    },\n" +
-    '    "other-server": {\n' +
-    '      "type": "remote",\n' +
-    '      "url": "https://example.com/mcp"\n' +
+    '    "servers": {\n' +
+    '      "deepwiki": {\n' +
+    '        "type": "remote",\n' +
+    '        "url": "https://mcp.deepwiki.com/mcp"\n' +
+    "      },\n" +
+    '      "other-server": {\n' +
+    '        "type": "remote",\n' +
+    '        "url": "https://example.com/mcp"\n' +
+    "      }\n" +
     "    }\n" +
     "  }\n" +
     "}"
@@ -79,9 +80,10 @@ function fullManagedConfig(plugin: string[]): string {
 
 interface ParsedShape {
   model?: string;
+  plugins?: string[];
   plugin?: string[];
   permission?: { skill?: Record<string, string> };
-  mcp?: Record<string, unknown>;
+  mcp?: { servers?: Record<string, unknown> } & Record<string, unknown>;
 }
 
 async function parseLocalConfig(fixtureDir: string): Promise<ParsedShape> {
@@ -89,7 +91,7 @@ async function parseLocalConfig(fixtureDir: string): Promise<ParsedShape> {
 }
 
 describe("uninstall config residue (conservative default)", () => {
-  test("default uninstall removes the plugin entry but keeps the permission and MCP keys", async () => {
+  test("default uninstall removes the plugins entry but keeps the permission and MCP keys", async () => {
     const fixtureDir = await makeFixture("default-keeps-keys");
     await writeLocalConfigText(fixtureDir, fullManagedConfig(["other-plugin", CANONICAL_PLUGIN_REF]));
 
@@ -99,24 +101,23 @@ describe("uninstall config residue (conservative default)", () => {
     expect(result.permissionRemoved).toBe(false);
     expect(result.mcpRemoved).toBe(false);
     const config = await parseLocalConfig(fixtureDir);
-    expect(config.plugin).toEqual(["other-plugin"]);
+    expect(config.plugins).toEqual(["other-plugin"]);
     expect(config.permission?.skill?.["intellisearch"]).toBe("allow");
     expect(config.permission?.skill?.["other-skill"]).toBe("allow");
-    const server = config.mcp?.["deepwiki"] as { url?: string } | undefined;
+    const server = config.mcp?.servers?.["deepwiki"] as { url?: string } | undefined;
     expect(server?.url).toBe("https://mcp.deepwiki.com/mcp");
-    expect(config.mcp?.["other-server"]).toBeDefined();
+    expect(config.mcp?.servers?.["other-server"]).toBeDefined();
     expect(config.model).toBe("some/model");
     expect(await readLocalConfigRaw(fixtureDir)).toContain("// consumer comment stays");
   });
 
-  test("default uninstall after a real install keeps permission and MCP keys in place", async () => {
+  test("default uninstall after a real install keeps the MCP server in place", async () => {
     const fixtureDir = await makeFixture("default-roundtrip");
     await install("local", fixtureDir, {
       mode: "plugin",
       addPluginConfig: true,
       migrateRootConfig: false,
       force: false,
-      configurePermission: true,
       configureMcp: true,
     });
 
@@ -126,9 +127,34 @@ describe("uninstall config residue (conservative default)", () => {
     expect(result.permissionRemoved).toBe(false);
     expect(result.mcpRemoved).toBe(false);
     const config = await parseLocalConfig(fixtureDir);
-    expect(config.plugin).toEqual([]);
-    expect(config.permission?.skill?.["intellisearch"]).toBe("allow");
-    expect(config.mcp?.["deepwiki"]).toBeDefined();
+    expect(config.plugins).toEqual([]);
+    expect(config.permission).toBeUndefined();
+    expect(config.mcp?.servers?.["deepwiki"]).toBeDefined();
+  });
+
+  test("purge uninstall still removes legacy v1 plugin and MCP spellings", async () => {
+    const fixtureDir = await makeFixture("default-legacy-spellings");
+    await writeLocalConfigText(
+      fixtureDir,
+      "{\n" +
+        '  "$schema": "https://opencode.ai/config.json",\n' +
+        `  "plugin": ["other-plugin", "${CANONICAL_PLUGIN_REF}"],\n` +
+        '  "mcp": {\n' +
+        '    "deepwiki": {\n' +
+        '      "type": "remote",\n' +
+        '      "url": "https://mcp.deepwiki.com/mcp"\n' +
+        "    }\n" +
+        "  }\n" +
+        "}"
+    );
+
+    const result = await uninstall("local", fixtureDir, { purgeConfig: true });
+
+    expect(result.pluginRemoved).toBe(true);
+    expect(result.mcpRemoved).toBe(true);
+    const config = await parseLocalConfig(fixtureDir);
+    expect(config.plugin).toEqual(["other-plugin"]);
+    expect(config.mcp?.["deepwiki"]).toBeUndefined();
   });
 });
 
@@ -143,11 +169,11 @@ describe("uninstall --purge-config", () => {
     expect(result.permissionRemoved).toBe(true);
     expect(result.mcpRemoved).toBe(true);
     const config = await parseLocalConfig(fixtureDir);
-    expect(config.plugin).toEqual(["other-plugin"]);
+    expect(config.plugins).toEqual(["other-plugin"]);
     expect(config.permission?.skill?.["intellisearch"]).toBeUndefined();
     expect(config.permission?.skill?.["other-skill"]).toBe("allow");
-    expect(config.mcp?.["deepwiki"]).toBeUndefined();
-    expect(config.mcp?.["other-server"]).toBeDefined();
+    expect(config.mcp?.servers?.["deepwiki"]).toBeUndefined();
+    expect(config.mcp?.servers?.["other-server"]).toBeDefined();
     expect(config.model).toBe("some/model");
     expect(await readLocalConfigRaw(fixtureDir)).toContain("// consumer comment stays");
   });
@@ -159,19 +185,18 @@ describe("uninstall --purge-config", () => {
       addPluginConfig: true,
       migrateRootConfig: false,
       force: false,
-      configurePermission: true,
       configureMcp: true,
     });
 
     const result = await uninstall("local", fixtureDir, { purgeConfig: true });
 
     expect(result.pluginRemoved).toBe(true);
-    expect(result.permissionRemoved).toBe(true);
+    expect(result.permissionRemoved).toBe(false);
     expect(result.mcpRemoved).toBe(true);
     const config = await parseLocalConfig(fixtureDir);
-    expect(config.plugin).toEqual([]);
-    expect(config.permission?.skill?.["intellisearch"]).toBeUndefined();
-    expect(config.mcp?.["deepwiki"]).toBeUndefined();
+    expect(config.plugins).toEqual([]);
+    expect(config.permission).toBeUndefined();
+    expect(config.mcp?.servers?.["deepwiki"]).toBeUndefined();
   });
 
   test("performs no config writes when none of the package-managed entries exist", async () => {
@@ -181,7 +206,7 @@ describe("uninstall --purge-config", () => {
       "{\n" +
         '  "$schema": "https://opencode.ai/config.json",\n' +
         '  "model": "some/model",\n' +
-        '  "plugin": ["other-plugin"]\n' +
+        '  "plugins": ["other-plugin"]\n' +
         "}"
     );
     const before = await snapshotDirectory(fixtureDir);
