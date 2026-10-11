@@ -1,11 +1,11 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "plugins": ["opencode-architect@latest"],
-  "permission": {
-    "MCP_DOCKER_duckduckgo*": "allow",
-    "MCP_DOCKER_exa*": "allow",
-    "deepWiki*": "allow",
-    "sequential-thinking_*": "allow",
-    "google_search":"deny"
-  }
+  "permissions": [
+    { "action": "tool.use", "resource": "MCP_DOCKER_duckduckgo*", "effect": "allow" },
+    { "action": "tool.use", "resource": "MCP_DOCKER_exa*", "effect": "allow" },
+    { "action": "tool.use", "resource": "deepWiki*", "effect": "allow" },
+    { "action": "tool.use", "resource": "sequential-thinking_*", "effect": "allow" },
+    { "action": "tool.use", "resource": "google_search", "effect": "deny" }
+  ]
 }

@@ -5,7 +5,20 @@ All notable changes to the intellisearch extension for OpenCode will be document
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-10-11
+
+### Changed
+- Ported the plugin to the OpenCode v2 Effect-first plugin API: `Plugin.define({ id, effect })` from `@opencode/plugin/effect`; load-time asset installation now runs in the plugin `effect` and remains fully exception-guarded (startup non-interference preserved)
+- Dependencies: added `@opencode/plugin` (2.0.26) and `effect` (4.0.0-rc.112); removed `@opencode-ai/plugin`; `@opencode-ai/sdk` moved to devDependencies (E2E harness only)
+- Declared `exports["./server"]` in package.json per the v2 distributed-package convention
+- Contract tests ported to invoke the v2 effect; advisory assertions now capture console warnings (v2 has no client log/TUI-toast hook surface)
+
+### Fixed
+- Project `.opencode/opencode.json` migrated to v2-native `permissions` ruleset (`tool.use` / resource / effect) from the v1 `permission` key map
+
 ## [0.7.1] - 2026-10-06
+EOF
+
 
 ### Added
 - `clear-cache` CLI subcommand (self-scoped only) plus best-effort pruning of this package's own cache copies on every install

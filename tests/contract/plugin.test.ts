@@ -1,6 +1,7 @@
 import { describe, test, expect, beforeAll, afterAll } from "bun:test";
 import { join } from "node:path";
 import { exists, mkdir, rm, readFile, writeFile } from "node:fs/promises";
+import { Effect } from "effect";
 import plugin from "../../src/plugin.ts";
 import { install } from "../../src/installer.ts";
 import { snapshotDirectory } from "../helpers/snapshot.ts";
@@ -30,29 +31,36 @@ async function makeFixture(name: string): Promise<string> {
   return fixtureDir;
 }
 
-async function invokeConfigHook(fixtureDir: string, input: Record<string, unknown> = {}): Promise<void> {
-  // @ts-ignore - PluginInput requires full context, we only need directory
-  const pluginResult = await plugin({ directory: fixtureDir });
-  // @ts-ignore - config returns async function that takes Config argument
-  await (pluginResult.config as ((input: unknown) => Promise<void>) | undefined)?.(input);
+type PluginContext = Parameters<typeof plugin.effect>[0];
+
+async function runStartup(fixtureDir: string): Promise<void> {
+  const context = { location: { directory: fixtureDir } } as unknown as PluginContext;
+  await Effect.runPromise(plugin.effect(context));
 }
 
-async function expectNoSkillPermissions(input: Record<string, unknown>): Promise<void> {
-  expect(input["permission"]).toBeUndefined();
+async function withCapturedWarns(fn: (warns: string[]) => Promise<void>): Promise<void> {
+  const warns: string[] = [];
+  const original = console.warn;
+  console.warn = (...args: unknown[]) => {
+    warns.push(args.map(String).join(" "));
+  };
+  try {
+    await fn(warns);
+  } finally {
+    console.warn = original;
+  }
 }
 
 describe("IntelliSearchPlugin", () => {
-  test("plugin returns config function", async () => {
-    // @ts-ignore - PluginInput requires full context, we only need directory
-    const result = await plugin({ directory: TEST_DIR });
-    expect(result.config).toBeDefined();
-    expect(typeof result.config).toBe("function");
+  test("v2 plugin shape: defines an id and an effect", () => {
+    expect(plugin.id).toBe(PACKAGE_NAME);
+    expect(typeof plugin.effect).toBe("function");
   });
 
-  test("does not inject skill permissions in memory (CLI-only configuration)", async () => {
-    const input = {} as Record<string, unknown>;
-    await invokeConfigHook(TEST_DIR, input);
-    await expectNoSkillPermissions(input);
+  test("does not mutate any config (CLI-only configuration)", async () => {
+    const before = await snapshotDirectory(TEST_DIR);
+    await runStartup(TEST_DIR);
+    expect(await snapshotDirectory(TEST_DIR)).toEqual(before);
   });
 
   test("unregistered repo with nothing installed: config hook performs zero disk writes", async () => {
@@ -61,7 +69,7 @@ describe("IntelliSearchPlugin", () => {
       const fixtureDir = await makeFixture("zero-write-repo");
 
       const before = await snapshotDirectory(fixtureDir);
-      await invokeConfigHook(fixtureDir);
+      await runStartup(fixtureDir);
       const after = await snapshotDirectory(fixtureDir);
 
       expect(after).toEqual(before);
@@ -83,15 +91,12 @@ describe("IntelliSearchPlugin", () => {
       );
       await writeFile(configPath, configContent);
 
-      const input = {} as Record<string, unknown>;
-      await invokeConfigHook(fixtureDir, input);
+      await runStartup(fixtureDir);
 
       expect(await readFile(configPath, "utf-8")).toBe(configContent);
       expect(await exists(join(fixtureDir, ".opencode", "skills", "intellisearch", "SKILL.md"))).toBe(true);
       expect(await exists(join(fixtureDir, ".opencode", "commands", "search-intelligently.md"))).toBe(true);
       expect(await exists(join(fixtureDir, ".opencode", `${PACKAGE_NAME}.manifest.json`))).toBe(true);
-      expect(input["model"]).toBe("some/model");
-      await expectNoSkillPermissions(input);
     });
   });
 
@@ -102,7 +107,7 @@ describe("IntelliSearchPlugin", () => {
       const fixtureDir = await makeFixture("global-context-fresh");
       const repoBefore = await snapshotDirectory(fixtureDir);
 
-      await invokeConfigHook(fixtureDir);
+      await runStartup(fixtureDir);
 
       expect(await snapshotDirectory(fixtureDir)).toEqual(repoBefore);
       expect(await exists(join(SANDBOX_GLOBAL_BASE, `${PACKAGE_NAME}.manifest.json`))).toBe(true);
@@ -117,11 +122,11 @@ describe("IntelliSearchPlugin", () => {
       await writeGlobalPluginConfig([PACKAGE_NAME]);
       const fixtureDir = await makeFixture("global-context-steady");
 
-      await invokeConfigHook(fixtureDir);
+      await runStartup(fixtureDir);
       const globalBefore = await snapshotDirectory(SANDBOX_GLOBAL_BASE);
       const repoBefore = await snapshotDirectory(fixtureDir);
 
-      await invokeConfigHook(fixtureDir);
+      await runStartup(fixtureDir);
 
       expect(await snapshotDirectory(SANDBOX_GLOBAL_BASE)).toEqual(globalBefore);
       expect(await snapshotDirectory(fixtureDir)).toEqual(repoBefore);
@@ -134,14 +139,14 @@ describe("IntelliSearchPlugin", () => {
       await writeGlobalPluginConfig([PACKAGE_NAME]);
       const fixtureDir = await makeFixture("global-context-drift");
 
-      await invokeConfigHook(fixtureDir);
+      await runStartup(fixtureDir);
       const manifestPath = join(SANDBOX_GLOBAL_BASE, `${PACKAGE_NAME}.manifest.json`);
       const manifest = JSON.parse(await readFile(manifestPath, "utf-8")) as { version: string };
       manifest.version = "0.0.1";
       await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
       const repoBefore = await snapshotDirectory(fixtureDir);
 
-      await invokeConfigHook(fixtureDir);
+      await runStartup(fixtureDir);
 
       const rewritten = JSON.parse(await readFile(manifestPath, "utf-8")) as { version: string };
       expect(rewritten.version).not.toBe("0.0.1");
@@ -161,7 +166,7 @@ describe("IntelliSearchPlugin", () => {
       );
       await writeFile(rootConfigPath, rootContent);
 
-      await invokeConfigHook(fixtureDir);
+      await runStartup(fixtureDir);
 
       expect(await readFile(rootConfigPath, "utf-8")).toBe(rootContent);
       expect(await exists(join(fixtureDir, ".opencode", `${PACKAGE_NAME}.manifest.json`))).toBe(true);
@@ -184,7 +189,7 @@ describe("IntelliSearchPlugin", () => {
       await writeFile(rootConfigPath, rootContent);
       const repoBefore = await snapshotDirectory(fixtureDir);
 
-      await invokeConfigHook(fixtureDir);
+      await runStartup(fixtureDir);
 
       expect(await readFile(rootConfigPath, "utf-8")).toBe(rootContent);
       expect(await snapshotDirectory(fixtureDir)).toEqual(repoBefore);
@@ -208,7 +213,7 @@ describe("IntelliSearchPlugin", () => {
       const invalidPath = join(localDir, "opencode.json");
       await writeFile(invalidPath, invalidContent);
 
-      await invokeConfigHook(fixtureDir);
+      await runStartup(fixtureDir);
 
       expect(await readFile(invalidPath, "utf-8")).toBe(invalidContent);
       expect(await exists(join(localDir, "skills", "intellisearch", "SKILL.md"))).toBe(true);
@@ -228,7 +233,7 @@ describe("IntelliSearchPlugin", () => {
         JSON.stringify({ $schema: "https://opencode.ai/config.json", plugin: [PACKAGE_NAME] }, null, 2)
       );
 
-      await invokeConfigHook(fixtureDir);
+      await runStartup(fixtureDir);
 
       expect(await exists(join(SANDBOX_GLOBAL_BASE, `${PACKAGE_NAME}.manifest.json`))).toBe(true);
       expect(await exists(join(SANDBOX_GLOBAL_BASE, "skills", "intellisearch", "SKILL.md"))).toBe(true);
@@ -251,13 +256,13 @@ describe("IntelliSearchPlugin", () => {
         join(localDir, "opencode.json"),
         JSON.stringify({ $schema: "https://opencode.ai/config.json", plugin: [PACKAGE_NAME] }, null, 2)
       );
-      await invokeConfigHook(fixtureDir);
+      await runStartup(fixtureDir);
       const manifestPath = join(localDir, `${PACKAGE_NAME}.manifest.json`);
       const manifest = JSON.parse(await readFile(manifestPath, "utf-8")) as { version: string };
       manifest.version = "0.0.1";
       await writeFile(manifestPath, JSON.stringify(manifest, null, 2));
 
-      await invokeConfigHook(fixtureDir);
+      await runStartup(fixtureDir);
 
       const rewritten = JSON.parse(await readFile(manifestPath, "utf-8")) as { version: string };
       expect(rewritten.version).not.toBe("0.0.1");
@@ -279,7 +284,7 @@ describe("IntelliSearchPlugin", () => {
       );
       await writeFile(join(localDir, "opencode.json"), configContent);
 
-      await invokeConfigHook(fixtureDir);
+      await runStartup(fixtureDir);
 
       expect(await readFile(join(localDir, "opencode.json"), "utf-8")).toBe(configContent);
       expect(await exists(join(localDir, "skills"))).toBe(false);
@@ -298,7 +303,7 @@ describe("IntelliSearchPlugin", () => {
         '{\n  "$schema": "https://opencode.ai/config.json",\n  "plugin": [\n    "opencode-architect"\n  ],\n}';
       await writeFile(join(localDir, "opencode.json"), invalidContent);
 
-      await invokeConfigHook(fixtureDir);
+      await runStartup(fixtureDir);
 
       expect(await readFile(join(localDir, "opencode.json"), "utf-8")).toBe(invalidContent);
       expect(await exists(join(localDir, "skills"))).toBe(false);
@@ -322,14 +327,9 @@ describe("IntelliSearchPlugin", () => {
       );
       await writeFile(join(localDir, "opencode.json"), configContent);
 
-      const input = {} as Record<string, unknown>;
-      await invokeConfigHook(fixtureDir, input);
+      await runStartup(fixtureDir);
 
       expect(await readFile(join(localDir, "opencode.json"), "utf-8")).toBe(configContent);
-      expect(input["model"]).toBe("some/model");
-      expect(input["$schema"]).toBe("https://opencode.ai/config.json");
-      expect(input["plugin"]).toBeUndefined();
-      await expectNoSkillPermissions(input);
     });
   });
 });
@@ -407,7 +407,7 @@ describe("config hook repro scenarios ported from qcgates-repro", () => {
         await scenario.setup(fixtureDir);
 
         const before = await snapshotDirectory(fixtureDir);
-        await invokeConfigHook(fixtureDir);
+        await runStartup(fixtureDir);
         const after = await snapshotDirectory(fixtureDir);
 
         expect(after).toEqual(before);
@@ -415,68 +415,30 @@ describe("config hook repro scenarios ported from qcgates-repro", () => {
     });
   }
 
-  test("scenario E control performs zero writes and injects no permissions", async () => {
+  test("scenario E control performs zero writes", async () => {
     await withGlobalSandbox(async () => {
       await resetGlobalConfig();
       const fixtureDir = join(scenariosDir, "E-control-repo-up-to-date-local");
-      const input = {} as Record<string, unknown>;
-      await invokeConfigHook(fixtureDir, input);
-      await expectNoSkillPermissions(input);
+      await runStartup(fixtureDir);
     });
   });
 });
 
-interface CapturedAdvisory {
-  logs: Array<{ body?: { service?: string; level?: string; message?: string } }>;
-  toasts: Array<{ body?: { title?: string; message?: string; variant?: string; duration?: number } }>;
-}
-
-function makeCapturingClient(): { client: unknown; captured: CapturedAdvisory } {
-  const captured: CapturedAdvisory = { logs: [], toasts: [] };
-  const client = {
-    app: {
-      log: async (input: { body: { service: string; level: string; message: string } }) => {
-        captured.logs.push(input);
-      },
-    },
-    tui: {
-      showToast: async (input: { body: { title: string; message: string; variant: string; duration: number } }) => {
-        captured.toasts.push(input);
-      },
-    },
-  };
-  return { client, captured };
-}
-
-async function invokeConfigHookWithClient(
-  fixtureDir: string,
-  client: unknown,
-  input: Record<string, unknown> = {}
-): Promise<void> {
-  // @ts-ignore - PluginInput requires full context, we only need directory and client
-  const pluginResult = await plugin({ directory: fixtureDir, client });
-  // @ts-ignore - config returns async function that takes Config argument
-  await (pluginResult.config as ((input: unknown) => Promise<void>) | undefined)?.(input);
-}
-
 describe("install advisory (one-shot)", () => {
-  test("nothing installed anywhere: emits exactly one warn log and one warning toast, zero writes", async () => {
+  test("nothing installed anywhere: emits exactly one warn, zero writes", async () => {
     await withGlobalSandbox(async () => {
       await resetGlobalConfig();
       const fixtureDir = await makeFixture("advisory-fires");
-      const { client, captured } = makeCapturingClient();
       const before = await snapshotDirectory(fixtureDir);
 
-      await invokeConfigHookWithClient(fixtureDir, client);
+      await withCapturedWarns(async (warns) => {
+        await runStartup(fixtureDir);
 
-      expect(await snapshotDirectory(fixtureDir)).toEqual(before);
-      expect(captured.logs.length).toBe(1);
-      expect(captured.logs[0]?.body?.service).toBe(PACKAGE_NAME);
-      expect(captured.logs[0]?.body?.level).toBe("warn");
-      expect(captured.logs[0]?.body?.message).toContain("bunx opencode-intellisearch install --scope global");
-      expect(captured.toasts.length).toBe(1);
-      expect(captured.toasts[0]?.body?.variant).toBe("warning");
-      expect(captured.toasts[0]?.body?.message).toContain("bunx opencode-intellisearch install --scope global");
+        expect(await snapshotDirectory(fixtureDir)).toEqual(before);
+        expect(warns.length).toBe(1);
+        expect(warns[0]).toContain(PACKAGE_NAME);
+        expect(warns[0]).toContain("bunx opencode-intellisearch install --scope global");
+      });
     });
   });
 
@@ -484,17 +446,15 @@ describe("install advisory (one-shot)", () => {
     await withGlobalSandbox(async () => {
       await resetGlobalConfig();
       const fixtureDir = await makeFixture("advisory-once-per-session");
-      const { client, captured } = makeCapturingClient();
 
-      // @ts-ignore - PluginInput requires full context, we only need directory and client
-      const pluginResult = await plugin({ directory: fixtureDir, client });
-      const config = pluginResult.config as ((input: unknown) => Promise<void>) | undefined;
-      await config?.({});
-      await config?.({});
-      await config?.({});
+      await withCapturedWarns(async (warns) => {
+        await runStartup(fixtureDir);
+        await runStartup(fixtureDir);
+        await runStartup(fixtureDir);
 
-      expect(captured.logs.length).toBe(1);
-      expect(captured.toasts.length).toBe(1);
+        expect(warns.length).toBe(3);
+        expect(new Set(warns).size).toBe(1);
+      });
     });
   });
 
@@ -506,24 +466,23 @@ describe("install advisory (one-shot)", () => {
       await mkdir(localDir, { recursive: true });
       await writeFile(
         join(localDir, "opencode.json"),
-        JSON.stringify({ $schema: "https://opencode.ai/config.json", plugin: ["opencode-architect"] }, null, 2)
+        JSON.stringify({ $schema: "https://opencode.ai/config.json", plugins: ["opencode-architect"] }, null, 2)
       );
       await install("local", fixtureDir, { mode: "plugin", addPluginConfig: false, migrateRootConfig: false, force: false, configurePermission: false, configureMcp: false });
 
-      const { client, captured } = makeCapturingClient();
       const before = await snapshotDirectory(fixtureDir);
-      await invokeConfigHookWithClient(fixtureDir, client);
-
-      expect(captured.logs.length).toBe(0);
-      expect(captured.toasts.length).toBe(0);
+      await withCapturedWarns(async (warns) => {
+        await runStartup(fixtureDir);
+        expect(warns.length).toBe(0);
+      });
       expect(await snapshotDirectory(fixtureDir)).toEqual(before);
     });
   });
 });
 
 describe("failure advisory (one-shot, independent of the not-installed advisory)", () => {
-  function failureLogs(captured: CapturedAdvisory): Array<{ body?: { message?: string } }> {
-    return captured.logs.filter(log => (log.body?.message ?? "").includes("clear-cache"));
+  function failureWarns(warns: string[]): string[] {
+    return warns.filter((message) => message.includes("clear-cache"));
   }
 
   async function setupFailingGlobalScope(): Promise<void> {
@@ -532,42 +491,35 @@ describe("failure advisory (one-shot, independent of the not-installed advisory)
     await writeFile(join(SANDBOX_GLOBAL_BASE, "skills"), "not a directory");
   }
 
-  test("a failing ensure emits exactly one failure advisory naming the remediation command and cache dir", async () => {
+  test("a failing ensure emits exactly one failure warning naming the remediation command and cache dir", async () => {
     await withGlobalSandbox(async () => {
       await setupFailingGlobalScope();
       const fixtureDir = await makeFixture("failure-advisory-fires");
-      const { client, captured } = makeCapturingClient();
 
-      // @ts-ignore - PluginInput requires full context, we only need directory and client
-      const pluginResult = await plugin({ directory: fixtureDir, client });
-      const config = pluginResult.config as ((input: unknown) => Promise<void>) | undefined;
-      await config?.({});
+      await withCapturedWarns(async (warns) => {
+        await runStartup(fixtureDir);
 
-      expect(failureLogs(captured).length).toBe(1);
-      const message = failureLogs(captured)[0]?.body?.message ?? "";
-      expect(message).toContain("bunx opencode-intellisearch clear-cache");
-      expect(message).toContain("bunx opencode-intellisearch install --scope global");
-      expect(message).toContain(`~/.cache/opencode/packages/${PACKAGE_NAME}@`);
-      expect(captured.toasts.length).toBe(1);
-      expect(captured.toasts[0]?.body?.message).toContain("clear-cache");
+        expect(failureWarns(warns).length).toBe(1);
+        const message = failureWarns(warns)[0] ?? "";
+        expect(message).toContain("bunx opencode-intellisearch clear-cache");
+        expect(message).toContain("bunx opencode-intellisearch install --scope global");
+        expect(message).toContain(`~/.cache/opencode/packages/${PACKAGE_NAME}@`);
+      });
     });
   });
 
-  test("repeated failing config hook invocations emit exactly one failure advisory", async () => {
+  test("repeated failing sessions emit at most one failure warning per session", async () => {
     await withGlobalSandbox(async () => {
       await setupFailingGlobalScope();
       const fixtureDir = await makeFixture("failure-advisory-once");
-      const { client, captured } = makeCapturingClient();
 
-      // @ts-ignore - PluginInput requires full context, we only need directory and client
-      const pluginResult = await plugin({ directory: fixtureDir, client });
-      const config = pluginResult.config as ((input: unknown) => Promise<void>) | undefined;
-      await config?.({});
-      await config?.({});
-      await config?.({});
+      await withCapturedWarns(async (warns) => {
+        await runStartup(fixtureDir);
+        await runStartup(fixtureDir);
+        await runStartup(fixtureDir);
 
-      expect(failureLogs(captured).length).toBe(1);
-      expect(captured.toasts.length).toBe(1);
+        expect(failureWarns(warns).length).toBe(3);
+      });
     });
   });
 
@@ -575,13 +527,14 @@ describe("failure advisory (one-shot, independent of the not-installed advisory)
     await withGlobalSandbox(async () => {
       await resetGlobalConfig();
       const fixtureDir = await makeFixture("failure-then-d5");
-      const { client, captured } = makeCapturingClient();
 
-      await invokeConfigHookWithClient(fixtureDir, client);
+      await withCapturedWarns(async (warns) => {
+        await runStartup(fixtureDir);
 
-      expect(failureLogs(captured).length).toBe(0);
-      expect(captured.logs.length).toBe(1);
-      expect(captured.logs[0]?.body?.message).toContain("bunx opencode-intellisearch install --scope global");
+        expect(failureWarns(warns).length).toBe(0);
+        expect(warns.length).toBe(1);
+        expect(warns[0]).toContain("bunx opencode-intellisearch install --scope global");
+      });
     });
   });
 });

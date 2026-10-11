@@ -1,8 +1,12 @@
 {
   "name": "opencode-intellisearch",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "type": "module",
   "module": "index.ts",
+  "exports": {
+    ".": "./index.ts",
+    "./server": "./index.ts"
+  },
   "bin": {
     "opencode-intellisearch": "./src/cli.ts"
   },
@@ -36,10 +40,11 @@
   },
   "dependencies": {
     "@inquirer/prompts": "^8.3.0",
-    "@opencode-ai/plugin": "^1.18.29",
-    "@opencode-ai/sdk": "^1.18.29"
+    "@opencode/plugin": "2.0.26",
+    "effect": "4.0.0-rc.112"
   },
   "devDependencies": {
+    "@opencode-ai/sdk": "^1.19.0",
     "@types/bun": "latest",
     "js-tiktoken": "^1.0.21",
     "typescript": "^5.7.0"
